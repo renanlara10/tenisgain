@@ -70,6 +70,17 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-mono);
 .btn-ghost:hover { border-color:var(--text2); color:var(--text); }
 .btn-danger { background:transparent; color:var(--red); border:1px solid var(--red); }
 .btn-danger:hover { background:var(--red); color:#fff; }
+.btn-recalc { background:linear-gradient(135deg,#1a2810,#0e1a08); color:var(--accent); border:1px solid var(--accent); font-weight:600; }
+.btn-recalc:hover { background:var(--accent); color:#0a1a0a; }
+.btn-pending { background:linear-gradient(135deg,#1a1608,#0e0f11); color:var(--amber); border:1px solid var(--amber); font-weight:600; }
+.btn-pending:hover { background:var(--amber); color:#0a0a0a; }
+tr.pending-row { background:#161208; }
+tr.pending-row:hover { background:#1e1a0a; }
+.pill-pending { background:#2e2208; color:var(--amber); border:1px solid #4a3a14; }
+.btn-gain { background:#0d2e15; color:var(--green); border:1px solid #1a4a24; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+.btn-gain:hover { background:var(--green); color:#0a1a0a; }
+.btn-loss { background:#2e0d12; color:var(--red); border:1px solid #4a1a20; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; transition:all 0.15s; }
+.btn-loss:hover { background:var(--red); color:#fff; }
 .chart-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:16px; margin-bottom:20px; height:220px; position:relative; }
 .table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
 table { width:100%; border-collapse:collapse; font-size:11px; }
@@ -130,10 +141,29 @@ tr.loss-row { background:#1a0d0e; } tr.loss-row:hover { background:#241114; }
         <input type="number" id="cfgStake" value="100" min="1" step="10" oninput="saveConfig()"></div>
       <div class="field"><label>Lucro recuperação (R$)</label>
         <input type="number" id="cfgLucro" value="10" min="1" step="5" oninput="saveConfig()"></div>
+      <div class="field"><label>% Recuperação do prejuízo (0–100)</label>
+        <input type="number" id="cfgRecPct" value="100" min="0" max="100" step="5" oninput="saveConfig()">
+      </div>
+      <div class="field" style="background:var(--surface2);border-radius:6px;padding:8px 10px;margin-top:-4px">
+        <span style="font-size:10px;color:var(--text3)">Fórmula:</span>
+        <span style="font-size:11px;color:var(--accent2);margin-top:3px" id="cfgFormula">
+          (prej.×100% + R$10) ÷ (odd−1)
+        </span>
+      </div>
       <div class="field"><label>Odd mínima</label>
         <input type="number" id="cfgOddMin" value="1.31" min="1.01" step="0.01" oninput="saveConfig()"></div>
       <div class="field"><label>Odd máxima</label>
         <input type="number" id="cfgOddMax" value="1.70" min="1.01" step="0.01" oninput="saveConfig()"></div>
+
+      <!-- Botão recalcular -->
+      <div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn btn-recalc" onclick="openRecalc()" style="width:100%">
+          ↻ Aplicar parâmetros ao histórico
+        </button>
+        <p style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">
+          Recalcula stakes de todos os jogos já inseridos usando os parâmetros atuais.
+        </p>
+      </div>
     </div>
 
     <div class="banca-bar">
@@ -159,7 +189,7 @@ tr.loss-row { background:#1a0d0e; } tr.loss-row:hover { background:#241114; }
 
   <div class="main">
     <div class="add-form">
-      <div class="panel-title" style="margin-bottom:12px">➕ Registrar jogo</div>
+      <div class="panel-title" style="margin-bottom:12px">➕ Registrar aposta</div>
       <div class="form-grid">
         <div class="field"><label>Data</label>
           <input type="text" id="fData" placeholder="ex: 19.05" maxlength="10"></div>
@@ -167,10 +197,11 @@ tr.loss-row { background:#1a0d0e; } tr.loss-row:hover { background:#241114; }
           <input type="text" id="fJogador" placeholder="ex: Zverev"></div>
         <div class="field"><label>Odd</label>
           <input type="number" id="fOdd" placeholder="1.50" min="1.01" step="0.01"></div>
-        <div class="field"><label>Resultado</label>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-win"  id="btnWin"  onclick="addGame(true)">✔ Ganhou</button>
-            <button class="btn btn-loss" id="btnLoss" onclick="addGame(false)">✘ Perdeu</button>
+        <div class="field"><label>Ação</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-pending" id="btnPending" onclick="addGame(null)" title="Registrar aposta sem resultado ainda">⏳ Registrar</button>
+            <button class="btn btn-win"     id="btnWin"    onclick="addGame(true)">✔ Gain</button>
+            <button class="btn btn-loss"    id="btnLoss"   onclick="addGame(false)">✘ Loss</button>
           </div>
         </div>
       </div>
@@ -210,6 +241,22 @@ tr.loss-row { background:#1a0d0e; } tr.loss-row:hover { background:#241114; }
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeReset()">Cancelar</button>
       <button class="btn btn-danger" onclick="doReset()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RECALCULAR -->
+<div class="modal-overlay" id="modalRecalc">
+  <div class="modal">
+    <h3>↻ Recalcular histórico?</h3>
+    <p>Todos os jogos já inseridos terão suas <strong>stakes recalculadas</strong> usando os parâmetros atuais:<br><br>
+      <span id="recalcParams" style="color:var(--accent2)"></span><br><br>
+      Os <strong>resultados (W/L)</strong> e <strong>odds</strong> são preservados. Apenas as stakes e prejuízos acumulados são recalculados.<br><br>
+      <strong style="color:var(--amber)">Esta ação não pode ser desfeita.</strong>
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeRecalc()">Cancelar</button>
+      <button class="btn btn-recalc" onclick="doRecalc()">↻ Confirmar recálculo</button>
     </div>
   </div>
 </div>
@@ -258,8 +305,11 @@ async function init() {
       document.getElementById('cfgBanca').value  = config.banca;
       document.getElementById('cfgStake').value  = config.stake;
       document.getElementById('cfgLucro').value  = config.lucro;
+      document.getElementById('cfgRecPct').value = config.recPct ?? 100;
       document.getElementById('cfgOddMin').value = config.oddMin;
       document.getElementById('cfgOddMax').value = config.oddMax;
+      document.getElementById('cfgFormula').textContent =
+        `(prej.×${config.recPct ?? 100}% + R$${config.lucro}) ÷ (odd−1)`;
     }
 
     // Listener tempo real — sincroniza entre todos os dispositivos automaticamente
@@ -284,9 +334,13 @@ window.saveConfig = async () => {
     banca:  parseFloat(document.getElementById('cfgBanca').value)  || 1000,
     stake:  parseFloat(document.getElementById('cfgStake').value)  || 100,
     lucro:  parseFloat(document.getElementById('cfgLucro').value)  || 10,
+    recPct: parseFloat(document.getElementById('cfgRecPct').value) ?? 100,
     oddMin: parseFloat(document.getElementById('cfgOddMin').value) || 1.31,
     oddMax: parseFloat(document.getElementById('cfgOddMax').value) || 1.70,
   };
+  // Atualizar label da fórmula
+  document.getElementById('cfgFormula').textContent =
+    `(prej.×${config.recPct}% + R$${config.lucro}) ÷ (odd−1)`;
   setStatus('saving');
   try { await setDoc(CFG_REF, config, {merge:true}); setStatus('synced'); }
   catch(e) { setStatus('offline'); }
@@ -302,18 +356,21 @@ window.addGame = async (won) => {
   if (!jogador) { alert('Informe o nome do jogador.'); return; }
   if (!odd || odd < 1.01) { alert('Informe uma odd válida.'); return; }
 
-  const { lostAccum } = calcState(games, config);
-  const stake = lostAccum === 0 ? config.stake : (lostAccum + config.lucro) / (odd - 1);
+  // Calcular stake considerando apenas jogos com resultado definido
+  const settledGames = games.filter(g => g.won !== null && g.won !== undefined);
+  const { lostAccum } = calcState(settledGames, config);
+  const recPct = (config.recPct ?? 100) / 100;
+  const stake = lostAccum === 0 ? config.stake : (lostAccum * recPct + config.lucro) / (odd - 1);
   const modo  = lostAccum === 0 ? 'normal' : 'recup';
 
-  document.getElementById('btnWin').disabled  = true;
-  document.getElementById('btnLoss').disabled = true;
+  ['btnPending','btnWin','btnLoss'].forEach(id => document.getElementById(id).disabled = true);
   setStatus('saving');
 
   try {
     await addDoc(GAMES_COL, {
       data, jogador, odd: +odd.toFixed(2),
-      stake: +stake.toFixed(2), modo, won,
+      stake: +stake.toFixed(2), modo,
+      won:   won,   // null = pendente, true = gain, false = loss
       prejBefore: +lostAccum.toFixed(2),
       ts: serverTimestamp(),
     });
@@ -324,8 +381,20 @@ window.addGame = async (won) => {
     alert('Erro ao salvar: ' + e.message);
     setStatus('offline');
   }
-  document.getElementById('btnWin').disabled  = false;
-  document.getElementById('btnLoss').disabled = false;
+  ['btnPending','btnWin','btnLoss'].forEach(id => document.getElementById(id).disabled = false);
+};
+
+// ── SET RESULT (marcar resultado de aposta pendente) ──
+window.setResult = async (id, won) => {
+  setStatus('saving');
+  try {
+    const { updateDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    await updateDoc(doc(db, "mmgr", "config", "games", id), { won });
+    setStatus('synced');
+  } catch(e) {
+    alert('Erro ao atualizar resultado: ' + e.message);
+    setStatus('offline');
+  }
 };
 
 // ── DELETE ──
@@ -338,18 +407,71 @@ window.deleteGame = async (id) => {
   } catch(e) { alert('Erro: ' + e.message); setStatus('offline'); }
 };
 
-// ── RESET ──
-window.openReset  = () => document.getElementById('modalOverlay').classList.add('open');
+// ── RECALCULAR HISTÓRICO ──
+window.openRecalc = () => {
+  if (!games.length) { alert('Nenhum jogo registrado para recalcular.'); return; }
+  const cfg = config;
+  document.getElementById('recalcParams').innerHTML =
+    `Banca: <strong>R$${cfg.banca}</strong> · Stake base: <strong>R$${cfg.stake}</strong><br>
+     Lucro recup.: <strong>R$${cfg.lucro}</strong> · % recup.: <strong>${cfg.recPct ?? 100}%</strong>`;
+  document.getElementById('modalRecalc').classList.add('open');
+};
+window.closeRecalc = () => document.getElementById('modalRecalc').classList.remove('open');
+
+window.doRecalc = async () => {
+  closeRecalc();
+  setStatus('saving');
+  try {
+    const cfg    = config;
+    const recPct = (cfg.recPct ?? 100) / 100;
+    let lostAccum = 0;
+
+    // Recalcular cada jogo em sequência, preservando won/odd/data/jogador
+    const updates = games.map(g => {
+      const stake = lostAccum === 0
+        ? cfg.stake
+        : (lostAccum * recPct + cfg.lucro) / (g.odd - 1);
+      const modo  = lostAccum === 0 ? 'normal' : 'recup';
+      const prejBefore = lostAccum;
+
+      if (g.won) {
+        lostAccum = 0;
+      } else {
+        lostAccum = +(lostAccum + stake).toFixed(2);
+      }
+
+      return {
+        id: g.id,
+        stake:      +stake.toFixed(2),
+        modo,
+        prejBefore: +prejBefore.toFixed(2),
+      };
+    });
+
+    // Salvar todas as atualizações no Firebase em paralelo
+    const { writeBatch } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const batch = writeBatch(db);
+    updates.forEach(u => {
+      const ref = doc(db, "mmgr", "config", "games", u.id);
+      batch.update(ref, { stake: u.stake, modo: u.modo, prejBefore: u.prejBefore });
+    });
+    await batch.commit();
+    setStatus('synced');
+  } catch(e) {
+    alert('Erro ao recalcular: ' + e.message);
+    setStatus('offline');
+  }
+};
 window.closeReset = () => document.getElementById('modalOverlay').classList.remove('open');
 window.doReset    = async () => {
   closeReset(); setStatus('saving');
   try {
     const snap = await getDocs(GAMES_COL);
     await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
-    const def = { banca:1000, stake:100, lucro:10, oddMin:1.31, oddMax:1.70 };
+    const def = { banca:1000, stake:100, lucro:10, recPct:100, oddMin:1.31, oddMax:1.70 };
     await setDoc(CFG_REF, def);
     config = def;
-    ['cfgBanca','cfgStake','cfgLucro','cfgOddMin','cfgOddMax'].forEach((id,i) => {
+    ['cfgBanca','cfgStake','cfgLucro','cfgRecPct','cfgOddMin','cfgOddMax'].forEach((id,i) => {
       document.getElementById(id).value = Object.values(def)[i];
     });
     setStatus('synced');
@@ -358,10 +480,17 @@ window.doReset    = async () => {
 
 // ── CALC STATE ──
 function calcState(arr, cfg) {
-  let banca = cfg.banca, lostAccum = 0, maxStake = 0, maxLost = 0, totV = 0, totD = 0, totalLucro = 0;
+  let banca=cfg.banca, lostAccum=0, maxStake=0, maxLost=0, totV=0, totD=0, totalLucro=0;
   const rows = arr.map(g => {
+    const isPending = g.won === null || g.won === undefined;
     const stake = g.stake;
     if (stake > maxStake) maxStake = stake;
+
+    if (isPending) {
+      // Jogo pendente: reserva a stake mas não altera banca nem lostAccum ainda
+      return { ...g, lucro: 0, lostAfter: lostAccum, banca, pending: true };
+    }
+
     if (g.won) {
       banca = +(banca - stake + stake * g.odd).toFixed(2);
       lostAccum = 0; totV++;
@@ -375,7 +504,7 @@ function calcState(arr, cfg) {
     const lucro = g.won
       ? (g.modo==='normal' ? +(stake*(g.odd-1)).toFixed(2) : +cfg.lucro.toFixed(2))
       : -stake;
-    return { ...g, lucro, lostAfter: g.won ? 0 : lostAccum, banca };
+    return { ...g, lucro, lostAfter: g.won ? 0 : lostAccum, banca, pending: false };
   });
   return { banca, lostAccum, maxStake, maxLost, totV, totD, totalLucro, rows };
 }
@@ -429,7 +558,9 @@ function render() {
   });
 
   // Tabela
-  document.getElementById('histCount').textContent = totAp+' jogo'+(totAp!==1?'s':'');
+  document.getElementById('histCount').innerHTML =
+    totAp + ' jogo' + (totAp !== 1 ? 's' : '') +
+    (pending > 0 ? ` · <span style="color:var(--amber)">⏳ ${pending} pendente${pending>1?'s':''}</span>` : '');
   const tw = document.getElementById('tableWrap');
   if (!rows.length) {
     tw.innerHTML = `<div class="empty"><div class="e-icon">🎾</div><div class="e-txt">Nenhum jogo registrado ainda.<br>Adicione o primeiro resultado acima.</div></div>`;
@@ -443,6 +574,32 @@ function render() {
 
   [...rows].reverse().forEach((r,i) => {
     const num = rows.length - i;
+
+    if (r.pending) {
+      // Linha pendente — aguardando resultado
+      html += `<tr class="pending-row">
+        <td style="color:var(--text3)">${num}</td>
+        <td style="color:var(--text2)">${r.data||'—'}</td>
+        <td style="font-weight:600;color:var(--amber)">${r.jogador} <span style="font-size:9px;color:var(--text3)">⏳</span></td>
+        <td style="font-weight:700;color:var(--accent)">${r.odd.toFixed(2)}</td>
+        <td>${r.modo==='normal'?'<span class="pill pill-norm">Base</span>':'<span class="pill pill-rec">↩ Recup.</span>'}</td>
+        <td style="color:var(--amber);font-weight:600">R$${r.stake.toFixed(2)}</td>
+        <td>${r.prejBefore>0?`<span style="color:var(--amber)">R$${r.prejBefore.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+        <td>
+          <span class="pill pill-pending">⏳ Aguardando</span>
+        </td>
+        <td colspan="2" style="text-align:center">
+          <div style="display:flex;gap:6px;justify-content:center">
+            <button class="btn-gain" onclick="setResult('${r.id}', true)">✔ Gain</button>
+            <button class="btn-loss" onclick="setResult('${r.id}', false)">✘ Loss</button>
+          </div>
+        </td>
+        <td style="color:var(--text3)">—</td>
+        <td><button class="del-btn" onclick="deleteGame('${r.id}')">✕</button></td>
+      </tr>`;
+      return;
+    }
+
     html += `<tr class="${r.won?'win-row':'loss-row'}">
       <td style="color:var(--text3)">${num}</td>
       <td style="color:var(--text2)">${r.data||'—'}</td>
@@ -451,7 +608,7 @@ function render() {
       <td>${r.modo==='normal'?'<span class="pill pill-norm">Base</span>':'<span class="pill pill-rec">↩ Recup.</span>'}</td>
       <td>R$${r.stake.toFixed(2)}</td>
       <td>${r.prejBefore>0?`<span style="color:var(--amber)">R$${r.prejBefore.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-      <td>${r.won?'<span class="pill pill-win">✔ Ganhou</span>':'<span class="pill pill-loss">✘ Perdeu</span>'}</td>
+      <td>${r.won?'<span class="pill pill-win">✔ Gain</span>':'<span class="pill pill-loss">✘ Loss</span>'}</td>
       <td>${r.won?`<span style="color:var(--green)">+R$${r.lucro.toFixed(2)}</span>`:`<span style="color:var(--red)">-R$${r.stake.toFixed(2)}</span>`}</td>
       <td>${r.lostAfter>0?`<span style="color:var(--amber)">R$${r.lostAfter.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
       <td style="font-weight:700;color:${r.banca>=cfg.banca?'var(--green)':'var(--red)'}">R$${r.banca.toFixed(2)}</td>
@@ -480,11 +637,14 @@ function updateNextBet() {
     nb.className = 'next-bet'+(lostAccum>0?' recovery':'');
     ns.textContent = lostAccum===0 ? 'R$ '+config.stake.toFixed(2) : '—';
     sub.textContent = lostAccum===0 ? 'Stake base · ciclo zerado' : 'Digite a odd para calcular';
-    fEl.textContent = lostAccum>0 ? `Fórmula: (R$${lostAccum.toFixed(2)} + R$${config.lucro}) ÷ (odd − 1)` : 'Digite a odd para ver o cálculo exato';
+    fEl.textContent = lostAccum>0
+      ? `Fórmula: (R$${lostAccum.toFixed(2)}×${config.recPct??100}% + R$${config.lucro}) ÷ (odd−1)`
+      : 'Digite a odd para ver o cálculo exato';
     return;
   }
 
-  const stake = lostAccum===0 ? config.stake : (lostAccum+config.lucro)/(odd-1);
+  const recPct = (config.recPct ?? 100) / 100;
+  const stake = lostAccum===0 ? config.stake : (lostAccum * recPct + config.lucro)/(odd-1);
   const modo  = lostAccum===0 ? 'normal' : 'recup';
   nb.className  = 'next-bet'+(modo==='recup'?' recovery':'');
   ns.textContent = 'R$ '+stake.toFixed(2);
@@ -492,8 +652,9 @@ function updateNextBet() {
     sub.textContent = `Stake base · lucro esperado: R$${(stake*(odd-1)).toFixed(2)}`;
     fEl.textContent = `R$${stake.toFixed(2)} × ${odd.toFixed(2)} = R$${(stake*odd).toFixed(2)} retorno`;
   } else {
-    sub.textContent = `Recuperação + R$${config.lucro.toFixed(2)} de lucro`;
-    fEl.textContent = `(R$${lostAccum.toFixed(2)} + R$${config.lucro}) ÷ (${odd.toFixed(2)} − 1) = R$${stake.toFixed(2)}`;
+    const pct = config.recPct ?? 100;
+    sub.textContent = `Recup. ${pct}% do prej. + R$${config.lucro.toFixed(2)} de lucro`;
+    fEl.textContent = `(R$${lostAccum.toFixed(2)}×${pct}% + R$${config.lucro}) ÷ (${odd.toFixed(2)}−1) = R$${stake.toFixed(2)}`;
   }
 }
 window.updateNextBet = updateNextBet;
