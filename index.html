@@ -146,16 +146,26 @@ tr.loss-row { background:#1a0d0e; } tr.loss-row:hover { background:#241114; }
         <input type="number" id="cfgBanca" value="1000" min="1" step="100" oninput="saveConfig()"></div>
       <div class="field"><label>Stake base (R$)</label>
         <input type="number" id="cfgStake" value="100" min="1" step="10" oninput="saveConfig()"></div>
-      <div class="field"><label>Lucro recuperação (R$)</label>
-        <input type="number" id="cfgLucro" value="10" min="1" step="5" oninput="saveConfig()"></div>
-      <div class="field"><label>% Recuperação do prejuízo (0–100)</label>
-        <input type="number" id="cfgRecPct" value="100" min="0" max="100" step="5" oninput="saveConfig()">
-      </div>
-      <div class="field" style="background:var(--surface2);border-radius:6px;padding:8px 10px;margin-top:-4px">
-        <span style="font-size:10px;color:var(--text3)">Fórmula:</span>
-        <span style="font-size:11px;color:var(--accent2);margin-top:3px" id="cfgFormula">
-          (prej.×100% + R$10) ÷ (odd−1)
+      <div class="field">
+        <label>% do prejuízo a recuperar por jogo</label>
+        <input type="number" id="cfgRecPct" value="100" min="1" max="100" step="5" oninput="saveConfig()">
+        <span style="font-size:10px;color:var(--text3);margin-top:3px;line-height:1.5">
+          100% = recupera tudo de uma vez · 20% = dilui em ~5 jogos
         </span>
+      </div>
+      <div class="field">
+        <label>Lucro mínimo por aposta de recuperação (R$)</label>
+        <input type="number" id="cfgLucro" value="10" min="1" step="5" oninput="saveConfig()">
+        <span style="font-size:10px;color:var(--text3);margin-top:3px;line-height:1.5">
+          Valor garantido de lucro mesmo em modo recuperação
+        </span>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:-4px">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">Fórmula da stake de recuperação</div>
+        <div style="font-size:13px;color:var(--accent2);font-weight:600" id="cfgFormula">(prej. × 100% + R$10) ÷ (odd − 1)</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.6" id="cfgFormulaEx">
+          Ex: prej. R$500 @ odd 1.50 → stake R$1.010
+        </div>
       </div>
       <div class="field"><label>Odd mínima</label>
         <input type="number" id="cfgOddMin" value="1.31" min="1.01" step="0.01" oninput="saveConfig()"></div>
@@ -168,7 +178,7 @@ tr.loss-row { background:#1a0d0e; } tr.loss-row:hover { background:#241114; }
           ↻ Aplicar parâmetros ao histórico
         </button>
         <p style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">
-          Recalcula stakes de todos os jogos já inseridos usando os parâmetros atuais.
+          ⚠️ Ação manual e opcional. Parâmetros alterados acima só afetam apostas <strong style="color:var(--accent)">futuras</strong>. Use este botão apenas se quiser recalcular apostas já gravadas.
         </p>
       </div>
     </div>
@@ -319,8 +329,14 @@ async function init() {
       document.getElementById('cfgRecPct').value = config.recPct ?? 100;
       document.getElementById('cfgOddMin').value = config.oddMin;
       document.getElementById('cfgOddMax').value = config.oddMax;
+      // Fórmula inicial
+      const pct    = config.recPct ?? 100;
+      const lucro  = config.lucro;
+      const stakeEx = (500 * (pct/100) + lucro) / 0.50;
       document.getElementById('cfgFormula').textContent =
-        `(prej.×${config.recPct ?? 100}% + R$${config.lucro}) ÷ (odd−1)`;
+        `(prej. × ${pct}% + R$${lucro}) ÷ (odd − 1)`;
+      document.getElementById('cfgFormulaEx').textContent =
+        `Ex: prej. R$500 @ odd 1.50 → stake R$${stakeEx.toFixed(2)}`;
     }
 
     // Listener tempo real — sincroniza entre todos os dispositivos automaticamente
@@ -349,9 +365,18 @@ window.saveConfig = async () => {
     oddMin: parseFloat(document.getElementById('cfgOddMin').value) || 1.31,
     oddMax: parseFloat(document.getElementById('cfgOddMax').value) || 1.70,
   };
-  // Atualizar label da fórmula
+
+  // Atualizar fórmula e exemplo visual
+  const pct     = config.recPct;
+  const lucro   = config.lucro;
+  const oddEx   = 1.50;
+  const prejEx  = 500;
+  const stakeEx = (prejEx * (pct/100) + lucro) / (oddEx - 1);
   document.getElementById('cfgFormula').textContent =
-    `(prej.×${config.recPct}% + R$${config.lucro}) ÷ (odd−1)`;
+    `(prej. × ${pct}% + R$${lucro}) ÷ (odd − 1)`;
+  document.getElementById('cfgFormulaEx').textContent =
+    `Ex: prej. R$${prejEx} @ odd ${oddEx.toFixed(2)} → stake R$${stakeEx.toFixed(2)}`;
+
   setStatus('saving');
   try { await setDoc(CFG_REF, config, {merge:true}); setStatus('synced'); }
   catch(e) { setStatus('offline'); }
@@ -367,12 +392,13 @@ window.addGame = async (won) => {
   if (!jogador) { alert('Informe o nome do jogador.'); return; }
   if (!odd || odd < 1.01) { alert('Informe uma odd válida.'); return; }
 
-  // Calcular stake considerando apenas jogos com resultado definido
+  // Calcula stake com os parâmetros ATUAIS — será gravada e nunca mais alterada
+  // (a menos que o usuário use o botão "Recalcular histórico" explicitamente)
   const settledGames = games.filter(g => g.won !== null && g.won !== undefined);
   const { lostAccum } = calcState(settledGames, config);
   const recPct = (config.recPct ?? 100) / 100;
-  const stake = lostAccum === 0 ? config.stake : (lostAccum * recPct + config.lucro) / (odd - 1);
-  const modo  = lostAccum === 0 ? 'normal' : 'recup';
+  const stake  = lostAccum === 0 ? config.stake : (lostAccum * recPct + config.lucro) / (odd - 1);
+  const modo   = lostAccum === 0 ? 'normal' : 'recup';
 
   ['btnPending','btnWin','btnLoss'].forEach(id => document.getElementById(id).disabled = true);
   setStatus('saving');
@@ -479,16 +505,19 @@ window.doReset    = async () => {
 };
 
 // ── CALC STATE ──
+// IMPORTANTE: usa SEMPRE os valores gravados em cada jogo (stake, odd, won, prejBefore)
+// cfg só é usado para: banca inicial (base do gráfico) e lucro display
+// Nenhum parâmetro atual recalcula valores de jogos já finalizados
 function calcState(arr, cfg) {
-  let banca=cfg.banca, lostAccum=0, maxStake=0, maxLost=0, totV=0, totD=0, totalLucro=0;
+  const bancaInicial = cfg.banca;
+  let banca=bancaInicial, lostAccum=0, maxStake=0, maxLost=0, totV=0, totD=0, totalLucro=0;
   const rows = arr.map(g => {
     const isPending = g.won === null || g.won === undefined;
-    const stake = g.stake;
+    const stake = g.stake; // SEMPRE a stake gravada no jogo
     if (stake > maxStake) maxStake = stake;
 
     if (isPending) {
-      // Jogo pendente: reserva a stake mas não altera banca nem lostAccum ainda
-      return { ...g, lucro: 0, lostAfter: lostAccum, banca, pending: true };
+      return { ...g, lucro:0, lostAfter:lostAccum, banca, pending:true };
     }
 
     if (g.won) {
@@ -500,29 +529,34 @@ function calcState(arr, cfg) {
       if (lostAccum > maxLost) maxLost = lostAccum;
       totD++;
     }
-    totalLucro = +(banca - cfg.banca).toFixed(2);
+    totalLucro = +(banca - bancaInicial).toFixed(2);
+
+    // Lucro calculado 100% pela stake e odd gravadas — sem depender de nenhum parâmetro atual
+    // Se ganhou: retorno líquido = stake × (odd-1) - prejuízo que recuperou
+    // Se perdeu: -stake
     const lucro = g.won
-      ? (g.modo==='normal' ? +(stake*(g.odd-1)).toFixed(2) : +cfg.lucro.toFixed(2))
+      ? +(stake * g.odd - stake - (g.prejBefore || 0)).toFixed(2)
       : -stake;
-    return { ...g, lucro, lostAfter: g.won ? 0 : lostAccum, banca, pending: false };
+
+    return { ...g, lucro, lostAfter: g.won ? 0 : lostAccum, banca, pending:false };
   });
-  return { banca, lostAccum, maxStake, maxLost, totV, totD, totalLucro, rows };
+  return { banca, bancaInicial, lostAccum, maxStake, maxLost, totV, totD, totalLucro, rows };
 }
 
 // ── RENDER ──
 function render() {
   const cfg = config;
-  const { banca, lostAccum, maxStake, maxLost, totV, totD, totalLucro, rows } = calcState(games, cfg);
-  const saldo = +(banca - cfg.banca).toFixed(2);
+  const { banca, bancaInicial, lostAccum, maxStake, maxLost, totV, totD, totalLucro, rows } = calcState(games, cfg);
+  const saldo = +(banca - bancaInicial).toFixed(2);
   const totAp = totV + totD;
 
   // Banca
   document.getElementById('bancaAtual').textContent = 'R$ ' + banca.toFixed(2);
-  const sp = ((saldo/cfg.banca)*100).toFixed(1);
+  const sp = ((saldo/bancaInicial)*100).toFixed(1);
   document.getElementById('bancaPct').textContent = (saldo>=0?'+':'')+sp+'%';
   document.getElementById('bancaPct').style.color = saldo>=0?'var(--green)':'var(--red)';
-  const bw = Math.max(3, Math.min(200, (banca/cfg.banca)*100));
-  document.getElementById('bancaBar').style.cssText = `width:${bw}%;background:${banca>=cfg.banca?'var(--green)':'var(--red)'}`;
+  const bw = Math.max(3, Math.min(200, (banca/bancaInicial)*100));
+  document.getElementById('bancaBar').style.cssText = `width:${bw}%;background:${banca>=bancaInicial?'var(--green)':'var(--red)'}`;
 
   // Stats
   document.getElementById('stTotal').textContent  = totAp;
@@ -539,7 +573,7 @@ function render() {
   pa.style.color = lostAccum>0?'var(--amber)':'var(--green)';
 
   // Chart
-  const hist   = [cfg.banca, ...rows.map(r=>r.banca)];
+  const hist   = [bancaInicial, ...rows.map(r=>r.banca)];
   const labels = ['Início', ...rows.map(r=>(r.jogador||'?').split(' ')[0]+' @'+r.odd)];
   const ptCol  = hist.map((v,i)=>i===0?'#555':v>=hist[i-1]?'#4ade80':'#f43f5e');
   if (chartInst) chartInst.destroy();
@@ -640,7 +674,7 @@ function render() {
       <td>${r.won?'<span class="pill pill-win">✔ Gain</span>':'<span class="pill pill-loss">✘ Loss</span>'}</td>
       <td>${r.won?`<span style="color:var(--green)">+R$${r.lucro.toFixed(2)}</span>`:`<span style="color:var(--red)">-R$${r.stake.toFixed(2)}</span>`}</td>
       <td>${r.lostAfter>0?`<span style="color:var(--amber)">R$${r.lostAfter.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-      <td style="font-weight:700;color:${r.banca>=cfg.banca?'var(--green)':'var(--red)'}">R$${r.banca.toFixed(2)}</td>
+      <td style="font-weight:700;color:${r.banca>=bancaInicial?'var(--green)':'var(--red)'}">R$${r.banca.toFixed(2)}</td>
       <td><button class="del-btn" onclick="deleteGame('${r.id}')">✕</button></td>
     </tr>`;
   });
@@ -684,8 +718,9 @@ function updateNextBet() {
     fEl.textContent = `R$${stake.toFixed(2)} × ${odd.toFixed(2)} = R$${(stake*odd).toFixed(2)} retorno`;
   } else {
     const pct = config.recPct ?? 100;
-    sub.textContent = `Recup. ${pct}% do prej. + R$${config.lucro.toFixed(2)} de lucro`;
-    fEl.textContent = `(R$${lostAccum.toFixed(2)}×${pct}% + R$${config.lucro}) ÷ (${odd.toFixed(2)}−1) = R$${stake.toFixed(2)}`;
+    const recValor = +(lostAccum * (pct/100)).toFixed(2);
+    sub.textContent = `Recupera R$${recValor} (${pct}% de R$${lostAccum.toFixed(2)}) + R$${config.lucro} lucro`;
+    fEl.textContent = `(R$${lostAccum.toFixed(2)} × ${pct}% + R$${config.lucro}) ÷ (${odd.toFixed(2)} − 1) = R$${stake.toFixed(2)}`;
   }
 }
 window.updateNextBet = updateNextBet;
