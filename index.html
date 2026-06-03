@@ -406,9 +406,11 @@ window.addGame = async (won) => {
   try {
     await addDoc(GAMES_COL, {
       data, jogador, odd: +odd.toFixed(2),
-      stake: +stake.toFixed(2), modo,
-      won:   won,   // null = pendente, true = gain, false = loss
+      stake:      +stake.toFixed(2),
+      modo,
+      won,
       prejBefore: +lostAccum.toFixed(2),
+      recPctUsed: config.recPct ?? 100,  // % de recuperação usado nesta aposta — gravado e imutável
       ts: serverTimestamp(),
     });
     document.getElementById('fJogador').value = '';
@@ -474,6 +476,7 @@ window.doRecalc = async () => {
         stake:      +stake.toFixed(2),
         modo,
         prejBefore,
+        recPctUsed: cfg.recPct ?? 100,
       });
 
       // Avançar lostAccum apenas para jogos com resultado
@@ -521,8 +524,12 @@ function calcState(arr, cfg) {
     }
 
     if (g.won) {
+      // Quanto de prejuízo foi efetivamente recuperado neste jogo
+      const recPct      = (g.recPctUsed ?? 100) / 100;
+      const recuperado  = +(lostAccum * recPct).toFixed(2);
+      lostAccum         = +Math.max(0, lostAccum - recuperado).toFixed(2);
       banca = +(banca - stake + stake * g.odd).toFixed(2);
-      lostAccum = 0; totV++;
+      totV++;
     } else {
       banca = +(banca - stake).toFixed(2);
       lostAccum = +(lostAccum + stake).toFixed(2);
@@ -531,14 +538,14 @@ function calcState(arr, cfg) {
     }
     totalLucro = +(banca - bancaInicial).toFixed(2);
 
-    // Lucro calculado 100% pela stake e odd gravadas — sem depender de nenhum parâmetro atual
-    // Se ganhou: retorno líquido = stake × (odd-1) - prejuízo que recuperou
-    // Se perdeu: -stake
+    // Lucro real do jogo = retorno - stake apostada - prejuízo recuperado neste jogo
+    const recPctUsed = (g.recPctUsed ?? 100) / 100;
+    const recuperado = g.won ? +(g.prejBefore * recPctUsed).toFixed(2) : 0;
     const lucro = g.won
-      ? +(stake * g.odd - stake - (g.prejBefore || 0)).toFixed(2)
+      ? +(stake * g.odd - stake - recuperado).toFixed(2)
       : -stake;
 
-    return { ...g, lucro, lostAfter: g.won ? 0 : lostAccum, banca, pending:false };
+    return { ...g, lucro, lostAfter: lostAccum, banca, pending:false };
   });
   return { banca, bancaInicial, lostAccum, maxStake, maxLost, totV, totD, totalLucro, rows };
 }
@@ -668,7 +675,10 @@ function render() {
       <td style="color:var(--text2)">${r.data||'—'}</td>
       <td style="font-weight:500">${r.jogador}</td>
       <td style="font-weight:700;color:var(--accent)">${r.odd.toFixed(2)}</td>
-      <td>${r.modo==='normal'?'<span class="pill pill-norm">Base</span>':'<span class="pill pill-rec">↩ Recup.</span>'}</td>
+      <td>${r.modo==='normal'
+        ? '<span class="pill pill-norm">Base</span>'
+        : `<span class="pill pill-rec">↩ ${r.recPctUsed??100}%</span>`
+      }</td>
       <td>R$${r.stake.toFixed(2)}</td>
       <td>${r.prejBefore>0?`<span style="color:var(--amber)">R$${r.prejBefore.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
       <td>${r.won?'<span class="pill pill-win">✔ Gain</span>':'<span class="pill pill-loss">✘ Loss</span>'}</td>
