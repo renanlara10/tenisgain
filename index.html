@@ -720,6 +720,7 @@ function openTournament(tid){
   renderSidebar();
   renderDetail(tid);
 }
+window.openTournament=openTournament;
 
 function renderDetail(tid){
   document.getElementById('viewDashboard').style.display='none';
@@ -825,6 +826,7 @@ function showDashboard(){
   renderSidebar();
   renderDashboard();
 }
+window.showDashboard=showDashboard;
 
 // ── NEXT BET ──
 function updateNextBet(){
