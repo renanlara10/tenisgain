@@ -699,17 +699,16 @@ function renderAll(){
 
 // ── SIDEBAR ──
 // Calcula saldo líquido real de um torneio somando lucros de todas as linhas
+// Ignora entradas de distribuição (isDistrib=true) — são ajustes internos, não movimentam banca real
 function calcTournamentSaldo(tid){
   const lines=linesMap[tid]||[];
   let saldo=0;
   lines.forEach(l=>{
-    const games=gamesMap[gkey(tid,l.id)]||[];
-    const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
-    const{rows}=calcLine(settled,0);
-    rows.forEach(r=>{
-      if(r.distribEntry) return;
-      if(r.won) saldo=+(saldo+(r.lucroAlvo||config.lucro||20)).toFixed(2);
-      else saldo=+(saldo-r.stake).toFixed(2);
+    const games=(gamesMap[gkey(tid,l.id)]||[])
+      .filter(g=>g.won!==null&&g.won!==undefined&&!g.isDistrib);
+    games.forEach(g=>{
+      if(g.won) saldo=+(saldo+(g.lucroAlvo||config.lucro||20)).toFixed(2);
+      else saldo=+(saldo-g.stake).toFixed(2);
     });
   });
   return saldo;
