@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TenisGain</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0f11;--surface:#16181c;--surface2:#1e2026;--border:#2a2d35;
+  --accent:#c8f135;--accent2:#3b82f6;--red:#f43f5e;--green:#4ade80;
+  --amber:#fb923c;--text:#f0f2f5;--text2:#8b909e;--text3:#555a66;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--r:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100vh;}
+
+/* LOADING */
+#loadingScreen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:100;}
+.logo{font-family:var(--fh);font-weight:800;font-size:18px;letter-spacing:-.5px;}
+.logo span{color:var(--accent);}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+.badge-status{font-size:10px;padding:4px 10px;border:1px solid var(--border);border-radius:99px;transition:all .3s;}
+.badge-status.saving{color:var(--amber);border-color:var(--amber);}
+.badge-status.synced{color:var(--accent);border-color:var(--accent);}
+.badge-status.offline{color:var(--red);border-color:var(--red);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 57px);}
+.sidebar{border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:57px;max-height:calc(100vh - 57px);overflow-y:auto;}
+.sb-sec{padding:14px 16px;}
+.sb-sec+.sb-sec{border-top:1px solid var(--border);}
+.sb-title{font-family:var(--fh);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:10px;}
+.main{padding:20px;overflow-y:auto;max-height:calc(100vh - 57px);}
+
+/* TOURNAMENT LIST */
+.t-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s;margin-bottom:3px;border:1px solid transparent;}
+.t-item:hover{background:var(--surface2);}
+.t-item.active{background:var(--surface2);border-color:var(--accent);}
+.t-item.archived{opacity:.45;}
+.t-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.t-dot.green{background:var(--green);}
+.t-dot.amber{background:var(--amber);}
+.t-dot.grey{background:var(--text3);}
+.t-info{flex:1;min-width:0;}
+.t-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.t-meta{font-size:10px;color:var(--text3);margin-top:1px;}
+.btn-new-t{width:100%;padding:8px;background:transparent;border:1px dashed var(--border);border-radius:8px;color:var(--text2);font-family:var(--fm);font-size:12px;cursor:pointer;transition:all .15s;margin-top:8px;}
+.btn-new-t:hover{border-color:var(--accent);color:var(--accent);}
+
+/* CONFIG */
+.cfg-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.cfg-field label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;}
+.cfg-field input{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-weight:600;color:var(--text);font-family:var(--fm);outline:none;width:100%;}
+.cfg-field input:focus{border-color:var(--accent);}
+.cfg-hint{font-size:10px;color:var(--text3);margin-top:2px;line-height:1.4;}
+.formula-box{background:var(--surface2);border-radius:8px;padding:10px;margin-top:6px;}
+.formula-box .f-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:4px;}
+.formula-box .f-val{font-size:12px;color:var(--accent2);font-weight:600;}
+.formula-box .f-ex{font-size:10px;color:var(--text3);margin-top:4px;}
+
+/* DASHBOARD */
+.dash-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;}
+.kpi .kv{font-family:var(--fh);font-size:20px;font-weight:800;line-height:1.1;}
+.kpi .kl{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.05em;}
+.active-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:20px;}
+.t-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;cursor:pointer;transition:border-color .2s;}
+.t-card:hover{border-color:var(--accent2);}
+.t-card.has-pending{border-color:var(--amber);}
+.tc-name{font-family:var(--fh);font-size:14px;font-weight:700;margin-bottom:4px;}
+.tc-sub{font-size:10px;color:var(--text3);margin-bottom:12px;}
+.tc-lines{display:flex;flex-direction:column;gap:6px;}
+.tc-line{background:var(--surface2);border-radius:6px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;}
+.tc-line .tl-name{font-size:11px;font-weight:600;}
+.tc-line .tl-info{font-size:10px;color:var(--text3);margin-top:2px;}
+.tc-line .tl-stake{font-family:var(--fh);font-size:14px;font-weight:700;}
+.chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;height:200px;position:relative;margin-bottom:20px;}
+
+/* TOURNAMENT DETAIL */
+.td-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.td-title{font-family:var(--fh);font-size:20px;font-weight:800;}
+.td-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.btn-back{background:transparent;border:1px solid var(--border);color:var(--text2);padding:7px 14px;border-radius:6px;font-family:var(--fm);font-size:12px;cursor:pointer;flex-shrink:0;}
+.btn-back:hover{border-color:var(--text);color:var(--text);}
+.btn-archive{background:transparent;border:1px solid var(--border);color:var(--text3);padding:6px 12px;border-radius:6px;font-family:var(--fm);font-size:11px;cursor:pointer;margin-left:auto;}
+.btn-archive:hover{border-color:var(--amber);color:var(--amber);}
+.btn-unarchive{border-color:var(--accent2)!important;color:var(--accent2)!important;}
+
+/* LINES TABS */
+.lines-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding-bottom:12px;}
+.line-tab{padding:7px 16px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;position:relative;}
+.line-tab:hover{border-color:var(--text2);color:var(--text);}
+.line-tab.active{background:var(--accent);color:#0a1a0a;border-color:var(--accent);}
+.line-tab.has-pending{border-color:var(--amber);color:var(--amber);}
+.line-tab.active.has-pending{background:var(--amber);color:#0a0a0a;border-color:var(--amber);}
+.line-tab .lt-badge{position:absolute;top:-4px;right:-4px;width:8px;height:8px;border-radius:50%;background:var(--red);}
+.btn-new-line{padding:7px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px dashed var(--border);background:transparent;color:var(--text3);transition:all .15s;font-family:var(--fm);}
+.btn-new-line:hover{border-color:var(--accent);color:var(--accent);}
+
+/* LINE DETAIL */
+.line-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.line-title{font-family:var(--fh);font-size:16px;font-weight:700;}
+.line-stake-cfg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);}
+.line-stake-cfg input{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:13px;font-weight:600;color:var(--accent);font-family:var(--fm);outline:none;width:90px;}
+.line-stake-cfg input:focus{border-color:var(--accent);}
+.btn-del-line{background:transparent;border:1px solid var(--border);color:var(--text3);padding:5px 10px;border-radius:6px;font-family:var(--fm);font-size:11px;cursor:pointer;margin-left:auto;}
+.btn-del-line:hover{border-color:var(--red);color:var(--red);}
+
+/* ADD FORM */
+.add-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px;}
+.form-row{display:grid;grid-template-columns:1fr 2fr 1fr auto;gap:10px;align-items:end;}
+.ff{display:flex;flex-direction:column;gap:4px;}
+.ff label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;}
+.ff input{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:14px;font-weight:600;color:var(--text);font-family:var(--fm);outline:none;width:100%;}
+.ff input:focus{border-color:var(--accent);}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+
+/* NEXT BET */
+.next-bet{border-radius:var(--r);padding:14px;margin-top:12px;border:1px solid var(--accent);background:linear-gradient(135deg,#1a2810,#111);}
+.next-bet.recovery{background:linear-gradient(135deg,#2a1010,#111);border-color:var(--amber);}
+.nb-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.nb-label{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:5px;}
+.nb-label.r{color:var(--amber);}
+.nb-val{font-family:var(--fh);font-size:26px;font-weight:800;color:var(--accent);}
+.nb-val.r{color:var(--amber);}
+.nb-sub{font-size:11px;color:var(--text2);margin-top:4px;}
+.nb-form{font-size:10px;color:var(--text3);margin-top:3px;}
+
+/* PENDING */
+.pending-sec{margin-bottom:14px;}
+.ps-title{font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.p-card{background:var(--surface);border:1px solid var(--amber);border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px;}
+.pc-name{font-weight:700;font-size:13px;color:var(--amber);}
+.pc-det{font-size:11px;color:var(--text2);margin-top:2px;}
+.pc-stake{font-family:var(--fh);font-size:16px;font-weight:800;color:var(--accent);}
+.pc-btns{display:flex;gap:8px;}
+
+/* TABLE */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.sec-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:16px;}
+table{width:100%;min-width:760px;border-collapse:collapse;font-size:11px;}
+th{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text3);font-size:10px;text-transform:uppercase;background:var(--surface2);}
+td{padding:8px 12px;border-bottom:1px solid #1e2026;}
+tr:last-child td{border-bottom:none;}
+.wr{background:#0a150b;}.wr:hover{background:#0f1f10;}
+.lr{background:#150a0b;}.lr:hover{background:#1f0f10;}
+.pr{background:#161208;}.pr:hover{background:#1e1a0a;}
+
+/* PILLS */
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:600;}
+.pw{background:#0d2e15;color:var(--green);border:1px solid #1a4a24;}
+.pl{background:#2e0d12;color:var(--red);border:1px solid #4a1a20;}
+.pp{background:#2e2208;color:var(--amber);border:1px solid #4a3a14;}
+.pn{background:#0d1e2e;color:var(--accent2);border:1px solid #1a2e4a;}
+.pr2{background:#2e1a0d;color:var(--amber);border:1px solid #4a2e1a;}
+
+/* BUTTONS */
+.btn{padding:8px 16px;border-radius:6px;font-family:var(--fm);font-size:12px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-green{background:var(--green);color:#0a1a0a;}
+.btn-green:hover:not(:disabled){background:#6ef09a;}
+.btn-red{background:var(--red);color:#fff;}
+.btn-red:hover:not(:disabled){background:#fb6680;}
+.btn-amber{background:transparent;border:1px solid var(--amber);color:var(--amber);font-weight:600;}
+.btn-amber:hover:not(:disabled){background:var(--amber);color:#000;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--text);color:var(--text);}
+.btn-danger{background:transparent;color:var(--red);border:1px solid var(--red);}
+.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-accent{background:var(--accent);color:#0a1a0a;font-weight:700;}
+.btn-accent:hover{background:#d8ff4a;}
+.btn-recalc{background:linear-gradient(135deg,#1a2810,#0e1a08);color:var(--accent);border:1px solid var(--accent);font-weight:600;}
+.btn-recalc:hover{background:var(--accent);color:#0a1a0a;}
+.btn-gain-t{background:#0d2e15;color:var(--green);border:1px solid #1a4a24;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-gain-t:hover{background:var(--green);color:#0a1a0a;}
+.btn-loss-t{background:#2e0d12;color:var(--red);border:1px solid #4a1a20;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-loss-t:hover{background:var(--red);color:#fff;}
+.del-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px;transition:color .15s;}
+.del-btn:hover{color:var(--red);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:400px;width:90%;}
+.modal h3{font-family:var(--fh);font-size:16px;margin-bottom:8px;}
+.modal p{font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.mf{margin-bottom:12px;}
+.mf label{font-size:11px;color:var(--text3);display:block;margin-bottom:4px;}
+.mf input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--text);font-family:var(--fm);outline:none;}
+.mf input:focus{border-color:var(--accent);}
+
+/* WARN / EMPTY */
+.warn-box{border:1px solid var(--amber);border-left:3px solid var(--amber);border-radius:var(--r);padding:12px 16px;margin-top:12px;font-size:12px;background:#1a1208;color:var(--amber);line-height:1.7;}
+.empty{text-align:center;padding:32px 20px;color:var(--text3);}
+.empty .ei{font-size:26px;margin-bottom:8px;}
+.empty .et{font-size:12px;}
+
+/* ALERTA 3 REDS */
+.alert-3reds{background:linear-gradient(135deg,#2a1a00,#161208);border:1px solid var(--amber);border-left:4px solid var(--amber);border-radius:var(--r);padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;animation:pulse-amber 2s ease-in-out infinite;}
+@keyframes pulse-amber{0%,100%{box-shadow:0 0 0 0 rgba(251,146,60,0);}50%{box-shadow:0 0 0 4px rgba(251,146,60,.15);}}
+.ar-info .ar-title{font-family:var(--fh);font-size:14px;font-weight:700;color:var(--amber);margin-bottom:4px;}
+.ar-info .ar-sub{font-size:12px;color:var(--text2);line-height:1.6;}
+.ar-info .ar-stakes{font-size:11px;color:var(--text3);margin-top:4px;}
+.btn-distrib{padding:9px 18px;border-radius:6px;background:var(--amber);color:#000;font-family:var(--fm);font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;}
+.btn-distrib:hover{background:#fca530;transform:translateY(-1px);}
+.distrib-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.distrib-row:last-child{border-bottom:none;}
+.distrib-row .dr-name{font-weight:600;color:var(--text);}
+.distrib-row .dr-val{color:var(--amber);font-weight:600;}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px;}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .sidebar{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--border);}
+  .dash-kpis{grid-template-columns:1fr 1fr;}
+  .form-row{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="loadingScreen">
+  <div class="spinner"></div>
+  <div style="font-family:var(--fh);font-size:22px;font-weight:800">Tenis<span style="color:var(--accent)">Gain</span></div>
+  <div style="font-size:12px;color:var(--text3)" id="loadMsg">Conectando...</div>
+</div>
+
+<div class="header">
+  <div class="logo">Tenis<span>Gain</span></div>
+  <div class="hdr-right">
+    <div class="badge-status synced" id="saveStatus">● online</div>
+    <button class="btn btn-ghost" onclick="openModal('modalReset')">Resetar</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sb-sec">
+      <div class="sb-title">🎾 Torneios ativos</div>
+      <div id="tournamentList"><div class="empty"><div class="et">Nenhum torneio</div></div></div>
+      <button class="btn-new-t" onclick="openModal('modalNewT')">+ Novo torneio</button>
+    </div>
+    <div class="sb-sec" id="archivedSec" style="display:none">
+      <div class="sb-title">📁 Arquivados</div>
+      <div id="archivedList"></div>
+    </div>
+    <div class="sb-sec">
+      <div class="sb-title">⚙ Parâmetros globais</div>
+      <div class="cfg-field"><label>Banca inicial (R$)</label>
+        <input type="number" id="cfgBanca" value="1000" min="1" step="100" oninput="saveConfig()"></div>
+      <div class="cfg-field">
+        <label>Lucro alvo por jogo (R$)</label>
+        <input type="number" id="cfgLucro" value="20" min="1" step="5" oninput="saveConfig()">
+        <span class="cfg-hint">Mesmo lucro em qualquer odd — stake calculada automaticamente</span>
+      </div>
+      <div class="cfg-field"><label>Odd mínima</label>
+        <input type="number" id="cfgOddMin" value="1.50" min="1.01" step="0.01" oninput="saveConfig()"></div>
+      <div class="cfg-field"><label>Odd máxima</label>
+        <input type="number" id="cfgOddMax" value="2.00" min="1.01" step="0.01" oninput="saveConfig()"></div>
+      <div class="formula-box">
+        <div class="f-lbl">Fórmula</div>
+        <div class="f-val" id="cfgFormula">stake = (prej. + R$20) ÷ (odd−1)</div>
+        <div class="f-ex"  id="cfgFormulaEx">@ 1.50 → R$40 · @ 1.75 → R$26,67 · @ 2.00 → R$20</div>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <button class="btn btn-recalc" style="width:100%" onclick="openRecalc()">↻ Recalcular histórico</button>
+        <p style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">⚠️ Parâmetros afetam apenas apostas <strong style="color:var(--accent)">futuras</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- DASHBOARD -->
+    <div id="viewDash">
+      <div class="dash-kpis" id="dashKpis"></div>
+      <div class="sec-hdr"><div class="sec-title">Torneios ativos</div></div>
+      <div class="active-cards" id="activeCards">
+        <div class="empty"><div class="ei">🎾</div><div class="et">Crie seu primeiro torneio</div></div>
+      </div>
+      <div class="sec-hdr"><div class="sec-title">Evolução da banca (consolidado)</div></div>
+      <div class="chart-wrap"><canvas id="dashChart"></canvas></div>
+    </div>
+
+    <!-- TOURNAMENT DETAIL -->
+    <div id="viewT" style="display:none">
+      <div class="td-header">
+        <button class="btn-back" onclick="showDash()">← Voltar</button>
+        <div>
+          <div class="td-title" id="tdName"></div>
+          <div class="td-meta"  id="tdMeta"></div>
+        </div>
+        <button class="btn-archive" id="btnArchive" onclick="toggleArchive()">Arquivar</button>
+      </div>
+
+      <!-- LINES TABS -->
+      <div class="lines-bar" id="linesBar"></div>
+
+      <!-- LINE CONTENT -->
+      <div id="lineContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAIS -->
+<div class="modal-overlay" id="modalNewT">
+  <div class="modal">
+    <h3>🎾 Novo torneio</h3>
+    <div class="mf"><label>Nome</label><input type="text" id="newTName" placeholder="ex: Roland Garros 2025"></div>
+    <div class="mf"><label>Superfície / Categoria (opcional)</label><input type="text" id="newTMeta" placeholder="ex: Saibro · ATP 1000"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalNewT')">Cancelar</button>
+      <button class="btn btn-accent" onclick="createTournament()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalNewL">
+  <div class="modal">
+    <h3>➕ Nova linha</h3>
+    <div class="mf"><label>Nome da linha</label><input type="text" id="newLName" placeholder="ex: Linha 1 ou Sinner"></div>
+    <div class="mf"><label>Stake base desta linha (R$)</label><input type="number" id="newLStake" placeholder="100" min="1" step="10"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalNewL')">Cancelar</button>
+      <button class="btn btn-accent" onclick="createLine()">Criar linha</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalDelL">
+  <div class="modal">
+    <h3>Excluir linha?</h3>
+    <p>Todos os jogos desta linha serão excluídos permanentemente.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalDelL')">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmDelLine()">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalReset">
+  <div class="modal">
+    <h3>Resetar tudo?</h3>
+    <p>Todos os torneios, linhas e jogos serão apagados permanentemente.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalReset')">Cancelar</button>
+      <button class="btn btn-danger" onclick="doReset()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalRecalc">
+  <div class="modal">
+    <h3>↻ Recalcular histórico</h3>
+    <p>Recalcula stakes usando os parâmetros atuais. Resultados e odds são preservados.<br><br>
+    <span id="recalcInfo" style="color:var(--accent2)"></span><br><br>
+    <strong style="color:var(--amber)">Esta ação não pode ser desfeita.</strong></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalRecalc')">Cancelar</button>
+      <button class="btn btn-recalc" onclick="doRecalc()">↻ Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ALERTA 3 REDS -->
+<div class="modal-overlay" id="modalAlert3Reds">
+  <div class="modal" style="max-width:440px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="font-size:28px">⚠️</div>
+      <div>
+        <h3 style="color:var(--amber)">3 derrotas consecutivas</h3>
+        <p style="font-size:11px;color:var(--text3);margin:0" id="alertLineName"></p>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:14px;font-size:13px;line-height:1.9">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:3px">Prejuízo acumulado</div>
+          <div style="font-family:var(--fh);font-size:20px;font-weight:700;color:var(--red)" id="alertPrej"></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-bottom:3px">Próxima stake</div>
+          <div style="font-family:var(--fh);font-size:20px;font-weight:700;color:var(--amber)" id="alertNextStake"></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text2)" id="alertMsg"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalAlert3Reds')">Continuar assim</button>
+      <button class="btn" style="background:var(--amber);color:#000;font-weight:700"
+        onclick="closeModal('modalAlert3Reds');openDistribuir()">⚡ Distribuir prejuízo</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DISTRIBUIR PREJUÍZO -->
+<div class="modal-overlay" id="modalDistribuir">
+  <div class="modal" style="max-width:480px">
+    <h3>⚡ Distribuir prejuízo entre linhas</h3>
+    <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.7">
+      O prejuízo da linha em alerta será dividido igualmente entre <strong>todas as linhas ativas</strong> deste torneio.
+      Cada linha recebe um ajuste de prejuízo e passará a calcular suas stakes a partir desse novo valor.
+    </p>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:14px" id="distribuirPreview"></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:14px;line-height:1.6" id="distribuirObs"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalDistribuir')">Cancelar</button>
+      <button class="btn" style="background:var(--accent);color:#000;font-weight:700"
+        onclick="confirmarDistribuir()">✔ Confirmar distribuição</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, collection,
+         addDoc, deleteDoc, getDocs, updateDoc, onSnapshot,
+         query, orderBy, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const fbApp = initializeApp({
+  apiKey:"AIzaSyB9xxsADjTHrVbBqeNEH5WWik6Iri0Y-Mo",
+  authDomain:"tenisgain.firebaseapp.com", projectId:"tenisgain",
+  storageBucket:"tenisgain.firebasestorage.app",
+  messagingSenderId:"895240879523",
+  appId:"1:895240879523:web:f05c85764fc8915551ae16"
+});
+const db = getFirestore(fbApp);
+
+// ── REFS ──
+const CFG_REF  = doc(db,"tg2","config");
+const T_COL    = collection(db,"tg2","config","tournaments");
+const tRef     = tid => doc(db,"tg2","config","tournaments",tid);
+const L_COL    = tid => collection(db,"tg2","config","tournaments",tid,"lines");
+const lRef     = (tid,lid) => doc(db,"tg2","config","tournaments",tid,"lines",lid);
+const G_COL    = (tid,lid) => collection(db,"tg2","config","tournaments",tid,"lines",lid,"games");
+const gRef     = (tid,lid,gid) => doc(db,"tg2","config","tournaments",tid,"lines",lid,"games",gid);
+
+// ── STATE ──
+let config      = {banca:1000,lucro:10,recPct:100,oddMin:1.31,oddMax:1.70};
+let tournaments = [];
+let linesMap    = {};   // {tid: [{id,name,stakeBase,...}]}
+let gamesMap    = {};   // {tid_lid: [games]}
+let tListeners  = {};
+let lListeners  = {};   // {tid: unsubscribe}
+let gListeners  = {};   // {tid_lid: unsubscribe}
+let currentTid  = null;
+let currentLid  = null;
+let lineToDelete= null;
+let dashChart   = null;
+
+// ── STATUS ──
+function setStatus(s){
+  const el=document.getElementById('saveStatus');
+  ({saving:()=>{el.textContent='● salvando...';el.className='badge-status saving';},
+    synced:()=>{el.textContent='● online · salvo';el.className='badge-status synced';},
+    offline:()=>{el.textContent='● offline';el.className='badge-status offline';}})[s]();
+}
+
+// ── KEY ──
+const gkey=(tid,lid)=>`${tid}_${lid}`;
+
+// ── INIT ──
+async function init(){
+  // Timeout de segurança — esconde o loading após 8s mesmo se Firebase demorar
+  const loadingTimeout = setTimeout(()=>{
+    document.getElementById('loadingScreen').style.display='none';
+    setStatus('offline');
+  }, 8000);
+
+  try{
+    const cs=await getDoc(CFG_REF);
+    if(cs.exists()) Object.assign(config,cs.data());
+    applyConfigUI();
+
+    // Esconder loading assim que a conexão inicial funcionar
+    clearTimeout(loadingTimeout);
+    document.getElementById('loadingScreen').style.display='none';
+    setStatus('synced');
+
+    onSnapshot(query(T_COL,orderBy('ts','asc')), snap=>{
+      tournaments=snap.docs.map(d=>({id:d.id,...d.data()}));
+      tournaments.forEach(t=>{
+        if(!lListeners[t.id]){
+          lListeners[t.id]=onSnapshot(query(L_COL(t.id),orderBy('ts','asc')), lsnap=>{
+            linesMap[t.id]=lsnap.docs.map(d=>({id:d.id,...d.data()}));
+            linesMap[t.id].forEach(l=>{
+              const k=gkey(t.id,l.id);
+              if(!gListeners[k]){
+                gListeners[k]=onSnapshot(query(G_COL(t.id,l.id),orderBy('ts','asc')), gsnap=>{
+                  gamesMap[k]=gsnap.docs.map(d=>({id:d.id,...d.data()}));
+                  renderAll();
+                });
+              }
+            });
+            renderAll();
+          });
+        }
+      });
+      renderAll();
+    });
+
+  }catch(e){
+    clearTimeout(loadingTimeout);
+    document.getElementById('loadingScreen').style.display='none';
+    document.getElementById('saveStatus').textContent='● erro de conexão';
+    document.getElementById('saveStatus').className='badge-status offline';
+    // Mostrar erro na tela principal em vez de travar no loading
+    console.error('Init error:', e);
+    setStatus('offline');
+    renderAll(); // Renderizar vazio para o app funcionar offline
+  }
+}
+
+// ── CONFIG ──
+function applyConfigUI(){
+  document.getElementById('cfgBanca').value  = config.banca;
+  document.getElementById('cfgLucro').value  = config.lucro;
+  document.getElementById('cfgOddMin').value = config.oddMin;
+  document.getElementById('cfgOddMax').value = config.oddMax;
+  updateFormulaDisplay();
+}
+function updateFormulaDisplay(){
+  const l=config.lucro||20;
+  document.getElementById('cfgFormula').textContent=`stake = (prej. + R$${l}) ÷ (odd−1)`;
+  document.getElementById('cfgFormulaEx').textContent=
+    `@ 1.50 → R$${(l/0.50).toFixed(2)} · @ 1.75 → R$${(l/0.75).toFixed(2)} · @ 2.00 → R$${(l/1.00).toFixed(2)}`;
+}
+window.saveConfig=async()=>{
+  config={
+    banca: parseFloat(document.getElementById('cfgBanca').value)||1000,
+    lucro: parseFloat(document.getElementById('cfgLucro').value)||20,
+    oddMin:parseFloat(document.getElementById('cfgOddMin').value)||1.50,
+    oddMax:parseFloat(document.getElementById('cfgOddMax').value)||2.00,
+  };
+  updateFormulaDisplay();
+  setStatus('saving');
+  try{await setDoc(CFG_REF,config,{merge:true});setStatus('synced');}
+  catch(e){setStatus('offline');}
+  renderAll();
+};
+
+// ── CALC STATE (por linha) ──
+// Lucro alvo fixo: stake = (prej + lucro) ÷ (odd−1)
+// Entradas especiais de distribuição (isDistrib=true) são tratadas como ajustes diretos
+function calcLine(games, stakeBase){
+  let lostAccum=0, maxLost=0, totV=0, totD=0;
+  const lucroAlvo=config.lucro||20;
+  const rows=games.map(g=>{
+    const isPend=g.won===null||g.won===undefined;
+    const stake=g.stake||0;
+    if(isPend) return{...g,lucro:0,lostAfter:lostAccum,banca:null,pending:true};
+
+    // Entradas de distribuição — ajuste direto no lostAccum
+    if(g.isDistrib){
+      if(g.modo==='distrib-zerar'){
+        // Zera o lostAccum da linha de origem
+        lostAccum=0;
+        return{...g,lucro:0,lostAfter:0,pending:false,distribEntry:true};
+      }else if(g.modo==='distrib-ajuste'){
+        // Adiciona o prejuízo distribuído
+        lostAccum=+(lostAccum+stake).toFixed(2);
+        if(lostAccum>maxLost) maxLost=lostAccum;
+        return{...g,lucro:-stake,lostAfter:lostAccum,pending:false,distribEntry:true};
+      }
+    }
+
+    if(g.won){
+      const lucro=g.lucroAlvo||lucroAlvo;
+      const pct=(g.recPctUsed??100)/100;
+      const rec=+(lostAccum*pct).toFixed(2);
+      lostAccum=+Math.max(0,lostAccum-rec).toFixed(2);
+      totV++;
+      return{...g,lucro,lostAfter:lostAccum,pending:false};
+    }else{
+      lostAccum=+(lostAccum+stake).toFixed(2);
+      if(lostAccum>maxLost) maxLost=lostAccum;
+      totD++;
+      return{...g,lucro:-stake,lostAfter:lostAccum,pending:false};
+    }
+  });
+  let b=config.banca;
+  rows.forEach(r=>{
+    if(r.pending||r.distribEntry){
+      if(!r.pending){
+        if(r.won||r.modo==='distrib-zerar') b=+(b-r.stake+r.stake*r.odd).toFixed(2);
+        else b=+(b-r.stake).toFixed(2);
+      }
+      r.banca=b;
+      return;
+    }
+    if(r.won) b=+(b-r.stake+r.stake*r.odd).toFixed(2);
+    else b=+(b-r.stake).toFixed(2);
+    r.banca=b;
+  });
+  return{rows,lostAccum,maxLost,totV,totD};
+}
+
+// Calcular próxima stake — lucro alvo fixo com % recuperação opcional
+// stake = (prej × recPct% + lucro) ÷ (odd−1)
+// recPct=100 → recupera tudo (padrão)
+// recPct=30  → recupera 30% do prejuízo + garante o lucro alvo
+function calcNextStake(tid,lid,odd,recPct){
+  const lucro=config.lucro||20;
+  const pct=(recPct??100)/100;
+  const games=gamesMap[gkey(tid,lid)]||[];
+  const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
+  const{lostAccum}=calcLine(settled,0);
+  const o=parseFloat(odd)||0;
+  if(!o||o<1.01) return{stake:+(lucro/0.50).toFixed(2),lostAccum,modo:'normal',ok:false,lucro,recPct:recPct??100};
+  // Com pct: recupera (lostAccum × pct) + lucro
+  const stake=(lostAccum*pct+lucro)/(o-1);
+  return{stake:+stake.toFixed(2),lostAccum,modo:lostAccum===0?'normal':'recup',ok:true,lucro,recPct:recPct??100};
+}
+
+// Consolidado global
+function calcConsolidated(){
+  let banca=config.banca;
+  const allGames=[];
+  Object.entries(gamesMap).forEach(([k,games])=>{
+    const [tid,lid]=k.split('_');
+    const l=(linesMap[tid]||[]).find(x=>x.id===lid);
+    games.forEach(g=>allGames.push({...g,tid,lid,stakeBase:l?.stakeBase||100}));
+  });
+  allGames.sort((a,b)=>(a.ts?.seconds||0)-(b.ts?.seconds||0));
+  const hist=[banca]; let totV=0,totD=0;
+  const lostPerLine={};
+  allGames.forEach(g=>{
+    if(g.won===null||g.won===undefined) return;
+    const k=gkey(g.tid,g.lid);
+    const la=lostPerLine[k]||0;
+    if(g.won){
+      const pct=(g.recPctUsed??100)/100;
+      lostPerLine[k]=+Math.max(0,la-la*pct).toFixed(2);
+      banca=+(banca-g.stake+g.stake*g.odd).toFixed(2);
+      totV++;
+    }else{
+      lostPerLine[k]=+(la+g.stake).toFixed(2);
+      banca=+(banca-g.stake).toFixed(2);
+      totD++;
+    }
+    hist.push(banca);
+  });
+  return{banca,saldo:+(banca-config.banca).toFixed(2),totV,totD,hist};
+}
+
+// ── RENDER ALL ──
+function renderAll(){
+  renderSidebar();
+  if(currentTid) renderDetail(currentTid);
+  else renderDash();
+}
+
+// ── SIDEBAR ──
+function renderSidebar(){
+  const active=tournaments.filter(t=>!t.archived);
+  const arch=tournaments.filter(t=>t.archived);
+  const listEl=document.getElementById('tournamentList');
+  if(!active.length){
+    listEl.innerHTML='<div class="empty"><div class="et">Nenhum torneio ativo</div></div>';
+  }else{
+    listEl.innerHTML=active.map(t=>{
+      const lines=linesMap[t.id]||[];
+      const totalPend=lines.reduce((s,l)=>{
+        return s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===null||g.won===undefined).length;
+      },0);
+      const totalV=lines.reduce((s,l)=>{
+        const gs=gamesMap[gkey(t.id,l.id)]||[];
+        return s+gs.filter(g=>g.won===true).length;
+      },0);
+      const totalD=lines.reduce((s,l)=>{
+        const gs=gamesMap[gkey(t.id,l.id)]||[];
+        return s+gs.filter(g=>g.won===false).length;
+      },0);
+      const dot=totalPend>0?'amber':'green';
+      return`<div class="t-item${currentTid===t.id?' active':''}" onclick="openTournament('${t.id}')">
+        <div class="t-dot ${dot}"></div>
+        <div class="t-info">
+          <div class="t-name">${t.name}</div>
+          <div class="t-meta">${lines.length} linha${lines.length!==1?'s':''} · ${totalV}V ${totalD}D${totalPend?' · ⏳'+totalPend:''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  // Arquivados
+  const arcSec=document.getElementById('archivedSec');
+  if(arch.length){
+    arcSec.style.display='block';
+    document.getElementById('archivedList').innerHTML=arch.map(t=>`
+      <div class="t-item archived${currentTid===t.id?' active':''}" onclick="openTournament('${t.id}')">
+        <div class="t-dot grey"></div>
+        <div class="t-info"><div class="t-name">${t.name}</div><div class="t-meta">Arquivado</div></div>
+      </div>`).join('');
+  }else{arcSec.style.display='none';}
+}
+
+// ── DASHBOARD ──
+function renderDash(){
+  document.getElementById('viewDash').style.display='block';
+  document.getElementById('viewT').style.display='none';
+  const{banca,saldo,totV,totD,hist}=calcConsolidated();
+  const totAp=totV+totD;
+
+  document.getElementById('dashKpis').innerHTML=`
+    <div class="kpi"><div class="kv" style="color:${saldo>=0?'var(--green)':'var(--red)'}">R$${banca.toFixed(2)}</div><div class="kl">Banca atual</div></div>
+    <div class="kpi"><div class="kv" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${saldo>=0?'+':''}R$${saldo.toFixed(2)}</div><div class="kl">Saldo</div></div>
+    <div class="kpi"><div class="kv"><span style="color:var(--green)">${totV}V</span> · <span style="color:var(--red)">${totD}D</span></div><div class="kl">${totAp>0?((totV/totAp)*100).toFixed(0)+'% acerto':'Apostas'}</div></div>
+    <div class="kpi"><div class="kv" style="color:var(--accent2)">${tournaments.filter(t=>!t.archived).length}</div><div class="kl">Torneios ativos</div></div>
+  `;
+
+  const active=tournaments.filter(t=>!t.archived);
+  const cardsEl=document.getElementById('activeCards');
+  if(!active.length){
+    cardsEl.innerHTML='<div class="empty"><div class="ei">🎾</div><div class="et">Crie seu primeiro torneio</div></div>';
+  }else{
+    cardsEl.innerHTML=active.map(t=>{
+      const lines=linesMap[t.id]||[];
+      const pend=lines.some(l=>(gamesMap[gkey(t.id,l.id)]||[]).some(g=>g.won===null||g.won===undefined));
+      const linesHtml=lines.map(l=>{
+        const k=gkey(t.id,l.id);
+        const games=gamesMap[k]||[];
+        const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
+        const{lostAccum,totV,totD}=calcLine(settled,0);
+        const lucro=config.lucro||20;
+        const midOdd=(config.oddMin+config.oddMax)/2;
+        const nextS=(lostAccum+lucro)/(midOdd-1);
+        const lPend=games.filter(g=>g.won===null||g.won===undefined).length;
+        return`<div class="tc-line">
+          <div>
+            <div class="tl-name">${l.name}${lPend?` <span style="color:var(--amber)">⏳${lPend}</span>`:''}</div>
+            <div class="tl-info">${totV}V ${totD}D${lostAccum>0?` · prej. <span style="color:var(--amber)">R$${lostAccum.toFixed(0)}</span>`:''}</div>
+          </div>
+          <div class="tl-stake" style="color:${lostAccum>0?'var(--amber)':'var(--accent)'}">R$${nextS.toFixed(0)}</div>
+        </div>`;
+      }).join('');
+      return`<div class="t-card${pend?' has-pending':''}" onclick="openTournament('${t.id}')">
+        <div class="tc-name">${t.name}</div>
+        <div class="tc-sub">${t.meta||''} · ${lines.length} linha${lines.length!==1?'s':''}</div>
+        <div class="tc-lines">${linesHtml||'<div style="font-size:11px;color:var(--text3)">Sem linhas — clique para adicionar</div>'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Chart
+  const labels=['Início',...Array.from({length:hist.length-1},(_,i)=>`#${i+1}`)];
+  const ptC=hist.map((v,i)=>i===0?'#555':v>=hist[i-1]?'#4ade80':'#f43f5e');
+  if(dashChart) dashChart.destroy();
+  dashChart=new Chart(document.getElementById('dashChart'),{
+    type:'line',
+    data:{labels,datasets:[{data:hist,borderColor:'#c8f135',backgroundColor:'rgba(200,241,53,0.05)',borderWidth:2,pointRadius:3,pointBackgroundColor:ptC,fill:true,tension:0.25}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'R$'+c.parsed.y.toFixed(2)},backgroundColor:'#1e2026',borderColor:'#2a2d35',borderWidth:1,titleColor:'#8b909e',bodyColor:'#f0f2f5',padding:10}},
+      scales:{y:{ticks:{callback:v=>'R$'+v.toFixed(0),color:'#555a66',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'},border:{display:false}},
+              x:{grid:{display:false},ticks:{color:'#555a66',font:{size:9},autoSkip:true,maxTicksLimit:15},border:{display:false}}}}
+  });
+}
+
+// ── TOURNAMENT DETAIL ──
+function openTournament(tid){
+  currentTid=tid;
+  const lines=linesMap[tid]||[];
+  if(lines.length>0 && !currentLid) currentLid=lines[0].id;
+  renderSidebar();
+  renderDetail(tid);
+}
+window.openTournament=openTournament;
+
+function renderDetail(tid){
+  document.getElementById('viewDash').style.display='none';
+  document.getElementById('viewT').style.display='block';
+  const t=tournaments.find(x=>x.id===tid);
+  if(!t) return;
+  document.getElementById('tdName').textContent=t.name;
+  document.getElementById('tdMeta').textContent=t.meta||'';
+  const ab=document.getElementById('btnArchive');
+  ab.textContent=t.archived?'Desarquivar':'Arquivar';
+  ab.className=t.archived?'btn-archive btn-unarchive':'btn-archive';
+
+  // Lines tabs
+  const lines=linesMap[tid]||[];
+  const bar=document.getElementById('linesBar');
+  bar.innerHTML=lines.map(l=>{
+    const k=gkey(tid,l.id);
+    const pend=(gamesMap[k]||[]).some(g=>g.won===null||g.won===undefined);
+    const isAct=currentLid===l.id;
+    return`<button class="line-tab${isAct?' active':''}${pend?' has-pending':''}" onclick="openLine('${l.id}')">
+      ${l.name}
+    </button>`;
+  }).join('');
+
+  if(!t.archived){
+    bar.innerHTML+=`<button class="btn-new-line" onclick="openModal('modalNewL')">+ Linha</button>`;
+  }
+
+  // Line content
+  if(!lines.length){
+    document.getElementById('lineContent').innerHTML=`
+      <div class="empty"><div class="ei">📋</div><div class="et">Nenhuma linha criada.<br>Clique em "+ Linha" para começar.</div></div>`;
+  }else{
+    if(!currentLid || !lines.find(x=>x.id===currentLid)) currentLid=lines[0].id;
+    renderLine(tid,currentLid,t.archived);
+  }
+}
+
+function openLine(lid){
+  currentLid=lid;
+  renderDetail(currentTid);
+}
+window.openLine=openLine;
+
+function renderLine(tid,lid,isArchived){
+  const l=(linesMap[tid]||[]).find(x=>x.id===lid);
+  if(!l) return;
+  const k=gkey(tid,lid);
+  const games=gamesMap[k]||[];
+  const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
+  const pending=games.filter(g=>g.won===null||g.won===undefined);
+  const{rows,lostAccum,totV,totD}=calcLine(games,l.stakeBase);
+
+  let html=`<div class="line-header">
+    <div class="line-title">${l.name}</div>
+    <div class="line-stake-cfg">
+      <span style="font-size:11px;color:var(--text3)">Lucro alvo:</span>
+      <span style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--accent)">R$${(config.lucro||20).toFixed(2)}/jogo</span>
+    </div>
+    ${!isArchived?`<button class="btn-del-line" onclick="askDelLine('${tid}','${lid}')">🗑 Excluir linha</button>`:''}
+  </div>`;
+
+  if(!isArchived){
+    // Next bet
+    const odd=parseFloat(document.getElementById('fOddInput_'+lid)||'') || 0;
+    html+=`<div class="add-form">
+      <div style="font-family:var(--fh);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:12px">➕ Registrar aposta — ${l.name}</div>
+      <div class="form-row">
+        <div class="ff"><label>Data</label><input type="text" id="fData_${lid}" placeholder="ex: 19.05" maxlength="10"></div>
+        <div class="ff"><label>Jogador</label><input type="text" id="fJog_${lid}" placeholder="ex: Zverev"></div>
+        <div class="ff"><label>Odd</label><input type="number" id="fOdd_${lid}" placeholder="1.50" min="1.01" step="0.01" oninput="updateNB('${tid}','${lid}')"></div>
+        <div class="ff"><label>Resultado</label>
+          <div class="btn-row">
+            <button class="btn btn-amber" id="btnP_${lid}" onclick="addGame('${tid}','${lid}',null)">⏳</button>
+            <button class="btn btn-green" id="btnW_${lid}" onclick="addGame('${tid}','${lid}',true)">✔ Gain</button>
+            <button class="btn btn-red"   id="btnL_${lid}" onclick="addGame('${tid}','${lid}',false)">✘ Loss</button>
+          </div>
+        </div>
+      </div>
+
+      ${lostAccum>0?`
+      <!-- % Recuperação só aparece quando há prejuízo -->
+      <div style="background:var(--surface2);border-radius:8px;padding:12px 14px;margin-top:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:160px">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+            % do prejuízo a recuperar neste jogo
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="range" id="fRecPct_${lid}" min="10" max="100" step="10" value="100"
+              oninput="updateNBPct('${tid}','${lid}')"
+              style="flex:1;accent-color:var(--accent);cursor:pointer">
+            <span style="font-family:var(--fh);font-size:18px;font-weight:700;color:var(--accent);min-width:44px;text-align:right" id="fRecPctVal_${lid}">100%</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+            <span>10% · dilui</span><span>50% · parcial</span><span>100% · tudo</span>
+          </div>
+        </div>
+        <div style="text-align:right;min-width:120px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Prej. após este gain</div>
+          <div style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--amber)" id="fRecPctRest_${lid}">R$0,00</div>
+        </div>
+      </div>`:''}
+
+      <div id="nb_${lid}" class="next-bet" style="margin-top:10px">
+        <div class="nb-inner">
+          <div>
+            <div class="nb-label" id="nbLbl_${lid}">▶ Stake para esta aposta</div>
+            <div class="nb-val"   id="nbVal_${lid}">—</div>
+            <div class="nb-sub"   id="nbSub_${lid}">Digite a odd para calcular</div>
+            <div class="nb-form"  id="nbFrm_${lid}">Fórmula: (prej. + R$${config.lucro||20}) ÷ (odd−1)</div>
+          </div>
+          <div style="text-align:right">
+            <div class="nb-label">Prejuízo em aberto</div>
+            <div style="font-family:var(--fh);font-size:18px;font-weight:700;color:${lostAccum>0?'var(--amber)':'var(--green)'}">R$ ${lostAccum.toFixed(2)}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Pending
+  if(pending.length){
+    html+=`<div class="pending-sec">
+      <div class="ps-title">⏳ ${pending.length} aposta${pending.length>1?'s':''} aguardando resultado</div>
+      <div>
+      ${pending.map(p=>`<div class="p-card">
+        <div><div class="pc-name">${p.jogador}</div><div class="pc-det">${p.data||'—'} · Odd <strong>${p.odd?.toFixed(2)}</strong> · Stake R$${p.stake?.toFixed(2)} · Lucro alvo R$${p.lucroAlvo||config.lucro||20}</div></div>
+        <div class="pc-stake">R$${p.stake?.toFixed(2)}</div>
+        <div class="pc-btns">
+          <button class="btn-gain-t" onclick="setResult('${tid}','${lid}','${p.id}',true)">✔ Gain</button>
+          <button class="btn-loss-t" onclick="setResult('${tid}','${lid}','${p.id}',false)">✘ Loss</button>
+        </div>
+      </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Tabela
+  html+=`<div class="sec-hdr">
+    <div class="sec-title">Histórico — ${l.name}</div>
+    <div style="font-size:11px;color:var(--text3)">${totV+totD} jogos · <span style="color:var(--green)">${totV}V</span> · <span style="color:var(--red)">${totD}D</span></div>
+  </div>`;
+
+  if(!rows.length){
+    html+=`<div class="empty"><div class="ei">🎾</div><div class="et">Nenhum jogo nesta linha</div></div>`;
+  }else{
+    html+=`<div class="table-wrap"><table><thead><tr>
+      <th>#</th><th>Data</th><th>Jogador</th><th>Odd</th><th>Modo</th>
+      <th>Stake</th><th>Prej. antes</th><th>Resultado</th><th>Lucro/Perda</th><th>Prej. após</th><th>Banca</th><th></th>
+    </tr></thead><tbody>`;
+    [...rows].reverse().forEach((r,i)=>{
+      const num=rows.length-i;
+      if(r.distribEntry){
+        html+=`<tr style="background:#0e1a1a;opacity:.7">
+          <td style="color:var(--text3)">${num}</td>
+          <td style="color:var(--text3)">—</td>
+          <td colspan="2" style="color:var(--accent2);font-size:10px;font-weight:600">${r.jogador}</td>
+          <td colspan="2" style="color:var(--text3);font-size:10px">${r.modo==='distrib-zerar'?'Zera prej. origem':'Ajuste +R$'+r.stake?.toFixed(2)}</td>
+          <td>${r.prejBefore>0?'<span style="color:var(--amber)">R$'+r.prejBefore?.toFixed(2)+'</span>':'—'}</td>
+          <td><span class="pill" style="background:#0a2020;color:var(--accent2);border:1px solid var(--accent2)">⚡ Distrib.</span></td>
+          <td colspan="2" style="color:var(--text3)">—</td>
+          <td style="color:var(--text3)">R$${r.banca?.toFixed(2)}</td>
+          <td><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
+        </tr>`;
+      }else if(r.pending){
+        html+=`<tr class="pr">
+          <td style="color:var(--text3)">${num}</td>
+          <td style="color:var(--text2)">${r.data||'—'}</td>
+          <td style="font-weight:600;color:var(--amber)">${r.jogador}</td>
+          <td style="font-weight:700;color:var(--accent)">${r.odd?.toFixed(2)}</td>
+          <td>${r.modo==='normal'?'<span class="pill pn">Base</span>':'<span class="pill pr2">↩ Recup.</span>'}</td>
+          <td style="color:var(--amber)">R$${r.stake?.toFixed(2)}</td>
+          <td>${r.prejBefore>0?'<span style="color:var(--amber)">R$'+r.prejBefore?.toFixed(2)+'</span>':'—'}</td>
+          <td><div style="display:flex;gap:6px">
+            <button class="btn-gain-t" onclick="setResult('${tid}','${lid}','${r.id}',true)">✔ Gain</button>
+            <button class="btn-loss-t" onclick="setResult('${tid}','${lid}','${r.id}',false)">✘ Loss</button>
+          </div></td>
+          <td>—</td><td>—</td><td>—</td>
+          <td><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
+        </tr>`;
+      }else{
+        html+=`<tr class="${r.won?'wr':'lr'}">
+          <td style="color:var(--text3)">${num}</td>
+          <td style="color:var(--text2)">${r.data||'—'}</td>
+          <td style="font-weight:500">${r.jogador}</td>
+          <td style="font-weight:700;color:var(--accent)">${r.odd?.toFixed(2)}</td>
+          <td>${r.modo==='normal'
+            ?'<span class="pill pn">Base</span>'
+            :'<span class="pill pr2">↩ '+(r.recPctUsed&&r.recPctUsed<100?r.recPctUsed+'%':'Recup.')+'</span>'
+          }</td>
+          <td>R$${r.stake?.toFixed(2)}</td>
+          <td>${r.prejBefore>0?`<span style="color:var(--amber)">R$${r.prejBefore?.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+          <td>${r.won?'<span class="pill pw">✔ Gain</span>':'<span class="pill pl">✘ Loss</span>'}</td>
+          <td>${r.won?`<span style="color:var(--green)">+R$${r.lucro?.toFixed(2)}</span>`:`<span style="color:var(--red)">-R$${r.stake?.toFixed(2)}</span>`}</td>
+          <td>${r.lostAfter>0?`<span style="color:var(--amber)">R$${r.lostAfter?.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+          <td style="font-weight:700;color:${(r.banca||0)>=config.banca?'var(--green)':'var(--red)'}">R$${r.banca?.toFixed(2)}</td>
+          <td><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
+        </tr>`;
+      }
+    });
+    html+=`</tbody></table></div>`;
+  }
+
+  if(lostAccum>0){
+    const consecReds=checkConsecReds(tid,lid);
+    if(consecReds){
+      html+=`<div class="alert-3reds">
+        <div class="ar-info">
+          <div class="ar-title">⚠️ 3 derrotas consecutivas</div>
+          <div class="ar-sub">Prejuízo acumulado: <strong style="color:var(--red)">R$${lostAccum.toFixed(2)}</strong></div>
+          <div class="ar-stakes">Próxima stake (${(config.oddMin+config.oddMax)/2} avg): <strong>R$${((lostAccum+(config.lucro||20))/((config.oddMin+config.oddMax)/2-1)).toFixed(2)}</strong></div>
+        </div>
+        <div class="ar-actions">
+          <button class="btn-distrib" onclick="openDistribuir('${tid}','${lid}')">⚡ Distribuir prejuízo</button>
+        </div>
+      </div>`;
+    }else{
+      html+=`<div class="warn-box" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <span>⚠️ Prejuízo em aberto: <strong>R$${lostAccum.toFixed(2)}</strong></span>
+        <button class="btn-distrib" style="font-size:11px;padding:6px 12px" onclick="openDistribuir('${tid}','${lid}')">⚡ Distribuir</button>
+      </div>`;
+    }
+  }
+
+  document.getElementById('lineContent').innerHTML=html;
+}
+
+// ── UPDATE NEXT BET ──
+function updateNBCore(tid,lid,odd,recPct){
+  const{stake,lostAccum,modo,ok,lucro}=calcNextStake(tid,lid,odd,recPct);
+  const nb=document.getElementById('nb_'+lid);
+  if(!nb) return;
+  const isRec=lostAccum>0;
+  const pct=recPct??100;
+
+  nb.className='next-bet'+(isRec?' recovery':'');
+  document.getElementById('nbLbl_'+lid).textContent=isRec?`↩ Recuperação (${pct}%)`:'▶ Stake para esta aposta';
+  document.getElementById('nbLbl_'+lid).className='nb-label'+(isRec?' r':'');
+  document.getElementById('nbVal_'+lid).textContent=ok?'R$ '+stake.toFixed(2):'—';
+  document.getElementById('nbVal_'+lid).className='nb-val'+(isRec?' r':'');
+
+  if(!ok){
+    document.getElementById('nbSub_'+lid).textContent='Digite a odd para calcular a stake';
+    document.getElementById('nbFrm_'+lid).textContent=
+      isRec?`Fórmula: (R$${lostAccum.toFixed(2)}×${pct}% + R$${lucro}) ÷ (odd−1)`
+           :`Fórmula: (R$0 + R$${lucro}) ÷ (odd−1)`;
+  }else{
+    if(isRec){
+      const recValor=+(lostAccum*(pct/100)).toFixed(2);
+      const restante=+(lostAccum-recValor).toFixed(2);
+      document.getElementById('nbSub_'+lid).textContent=
+        `Recupera R$${recValor} (${pct}% de R$${lostAccum.toFixed(2)}) + R$${lucro} lucro`;
+      document.getElementById('nbFrm_'+lid).textContent=
+        `(R$${lostAccum.toFixed(2)}×${pct}% + R$${lucro}) ÷ (${odd.toFixed(2)}−1) = R$${stake.toFixed(2)}`;
+      // Atualizar "prejuízo restante após gain"
+      const restEl=document.getElementById('fRecPctRest_'+lid);
+      if(restEl) restEl.textContent='R$'+restante.toFixed(2);
+    }else{
+      document.getElementById('nbSub_'+lid).textContent=`Lucro fixo garantido: R$${lucro.toFixed(2)}`;
+      document.getElementById('nbFrm_'+lid).textContent=
+        `(R$0 + R$${lucro}) ÷ (${odd.toFixed(2)}−1) = R$${stake.toFixed(2)}`;
+    }
+  }
+}
+
+function updateNB(tid,lid){
+  const odd=parseFloat(document.getElementById('fOdd_'+lid)?.value)||0;
+  const recPctEl=document.getElementById('fRecPct_'+lid);
+  const recPct=recPctEl?parseInt(recPctEl.value):100;
+  updateNBCore(tid,lid,odd,recPct);
+}
+window.updateNB=updateNB;
+
+// Chamado pelo slider de % recuperação
+window.updateNBPct=function(tid,lid){
+  const odd=parseFloat(document.getElementById('fOdd_'+lid)?.value)||0;
+  const recPctEl=document.getElementById('fRecPct_'+lid);
+  const recPct=recPctEl?parseInt(recPctEl.value):100;
+  // Atualizar label do slider
+  const valEl=document.getElementById('fRecPctVal_'+lid);
+  if(valEl) valEl.textContent=recPct+'%';
+  updateNBCore(tid,lid,odd,recPct);
+};
+
+// ── TOURNAMENT CRUD ──
+window.createTournament=async()=>{
+  const name=document.getElementById('newTName').value.trim();
+  if(!name){alert('Informe o nome.');return;}
+  const meta=document.getElementById('newTMeta').value.trim();
+  setStatus('saving');
+  try{
+    const ref=await addDoc(T_COL,{name,meta,archived:false,ts:serverTimestamp()});
+    closeModal('modalNewT');
+    document.getElementById('newTName').value='';
+    document.getElementById('newTMeta').value='';
+    currentTid=ref.id; currentLid=null;
+    setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+window.toggleArchive=async()=>{
+  if(!currentTid) return;
+  const t=tournaments.find(x=>x.id===currentTid);
+  setStatus('saving');
+  try{await updateDoc(tRef(currentTid),{archived:!t.archived});setStatus('synced');}
+  catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+
+// ── LINE CRUD ──
+window.createLine=async()=>{
+  if(!currentTid) return;
+  const name=document.getElementById('newLName').value.trim()||'Linha';
+  const stakeBase=parseFloat(document.getElementById('newLStake').value)||100;
+  setStatus('saving');
+  try{
+    const ref=await addDoc(L_COL(currentTid),{name,stakeBase,ts:serverTimestamp()});
+    closeModal('modalNewL');
+    document.getElementById('newLName').value='';
+    document.getElementById('newLStake').value='';
+    currentLid=ref.id;
+    setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+window.updateLineStake=async(tid,lid,val)=>{
+  const v=parseFloat(val)||100;
+  setStatus('saving');
+  try{await updateDoc(lRef(tid,lid),{stakeBase:v});setStatus('synced');}
+  catch(e){setStatus('offline');}
+};
+window.askDelLine=(tid,lid)=>{lineToDelete={tid,lid};openModal('modalDelL');};
+window.confirmDelLine=async()=>{
+  if(!lineToDelete) return;
+  closeModal('modalDelL');setStatus('saving');
+  try{
+    const{tid,lid}=lineToDelete;
+    const gs=await getDocs(G_COL(tid,lid));
+    await Promise.all(gs.docs.map(g=>deleteDoc(g.ref)));
+    await deleteDoc(lRef(tid,lid));
+    if(currentLid===lid) currentLid=null;
+    lineToDelete=null;setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+
+// ── GAME CRUD ──
+window.addGame=async(tid,lid,won)=>{
+  const jogador=document.getElementById('fJog_'+lid)?.value.trim();
+  const odd=parseFloat(document.getElementById('fOdd_'+lid)?.value);
+  const data=document.getElementById('fData_'+lid)?.value.trim();
+  if(!jogador){alert('Informe o jogador.');return;}
+  if(!odd||odd<1.01){alert('Informe uma odd válida.');return;}
+
+  // Ler % de recuperação do slider (só existe quando há prejuízo)
+  const recPctEl=document.getElementById('fRecPct_'+lid);
+  const recPct=recPctEl?parseInt(recPctEl.value):100;
+
+  const{stake,lostAccum,modo}=calcNextStake(tid,lid,odd,recPct);
+  const lucroAlvo=config.lucro||20;
+
+  ['btnP_','btnW_','btnL_'].forEach(p=>{
+    const el=document.getElementById(p+lid);if(el)el.disabled=true;
+  });
+  setStatus('saving');
+  try{
+    await addDoc(G_COL(tid,lid),{
+      data,jogador,odd:+odd.toFixed(2),
+      stake:+stake.toFixed(2),
+      modo,won,
+      prejBefore:+lostAccum.toFixed(2),
+      lucroAlvo,
+      recPctUsed:recPct,   // % gravado imutável — exatamente o que foi escolhido
+      ts:serverTimestamp(),
+    });
+    if(document.getElementById('fJog_'+lid)) document.getElementById('fJog_'+lid).value='';
+    if(document.getElementById('fOdd_'+lid)) document.getElementById('fOdd_'+lid).value='';
+    // Resetar slider para 100% após gravar
+    if(recPctEl){recPctEl.value=100;const vEl=document.getElementById('fRecPctVal_'+lid);if(vEl)vEl.textContent='100%';}
+    setStatus('synced');
+    if(won===false){
+      setTimeout(()=>{
+        if(checkConsecReds(tid,lid)) showAlert3Reds(tid,lid);
+      },600);
+    }
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+  ['btnP_','btnW_','btnL_'].forEach(p=>{
+    const el=document.getElementById(p+lid);if(el)el.disabled=false;
+  });
+};
+// ── DETECÇÃO DE 3 REDS CONSECUTIVOS ──
+function checkConsecReds(tid, lid){
+  const games = (gamesMap[gkey(tid,lid)]||[]).filter(g=>g.won!==null&&g.won!==undefined);
+  if(games.length < 3) return false;
+  const last3 = games.slice(-3);
+  return last3.every(g=>g.won===false);
+}
+
+// ── ALERTA 3 REDS ──
+let alertContext = null; // {tid, lid}
+
+function showAlert3Reds(tid, lid){
+  const l=(linesMap[tid]||[]).find(x=>x.id===lid);
+  const{lostAccum}=calcNextStake(tid,lid,0);
+  const lucro=config.lucro||20;
+  const midOdd=(config.oddMin+config.oddMax)/2;
+  const nextStake=(lostAccum+lucro)/(midOdd-1);
+  const lines=(linesMap[tid]||[]);
+  const nLinhas=lines.length;
+  const prejPorLinha=+(lostAccum/nLinhas).toFixed(2);
+
+  alertContext={tid,lid};
+  document.getElementById('alertLineName').textContent=`Linha: ${l?.name||lid}`;
+  document.getElementById('alertPrej').textContent=`R$${lostAccum.toFixed(2)}`;
+  document.getElementById('alertNextStake').textContent=`R$${nextStake.toFixed(2)}`;
+  document.getElementById('alertMsg').innerHTML=
+    `A próxima aposta desta linha exigiria <strong style="color:var(--red)">R$${nextStake.toFixed(2)}</strong> para recuperar o prejuízo de R$${lostAccum.toFixed(2)}.<br><br>`+
+    `Distribuindo entre ${nLinhas} linha${nLinhas>1?'s':''}: cada linha recebe <strong style="color:var(--amber)">R$${prejPorLinha.toFixed(2)}</strong> de prejuízo — stake máxima cai para <strong style="color:var(--green)">R$${((prejPorLinha+lucro)/(midOdd-1)).toFixed(2)}</strong>.`;
+  openModal('modalAlert3Reds');
+}
+window.showAlert3Reds=showAlert3Reds;
+
+// ── ABRIR DISTRIBUIR (pode ser chamado diretamente da linha) ──
+let distribuirContext=null;
+
+window.openDistribuir=function(tid,lid){
+  const useTid=tid||alertContext?.tid||currentTid;
+  const useLid=lid||alertContext?.lid||currentLid;
+  if(!useTid||!useLid) return;
+
+  const lines=(linesMap[useTid]||[]);
+  const nLinhas=lines.length;
+  if(nLinhas<2){alert('Precisa de pelo menos 2 linhas para distribuir.');return;}
+
+  const{lostAccum}=calcNextStake(useTid,useLid,0);
+  if(lostAccum<=0){alert('Esta linha não tem prejuízo a distribuir.');return;}
+
+  const lucro=config.lucro||20;
+  const midOdd=(config.oddMin+config.oddMax)/2;
+  const prejPorLinha=+(lostAccum/nLinhas).toFixed(2);
+
+  distribuirContext={tid:useTid,lid:useLid,lostAccum,prejPorLinha,lines};
+
+  // Montar preview
+  const preview=lines.map(l=>{
+    const k=gkey(useTid,l.id);
+    const games=(gamesMap[k]||[]).filter(g=>g.won!==null&&g.won!==undefined);
+    let la=0;
+    games.forEach(g=>{if(g.won)la=0;else la=+(la+g.stake).toFixed(2);});
+    const novoPreju=+(la+prejPorLinha).toFixed(2);
+    const novaStake=(novoPreju+lucro)/(midOdd-1);
+    const isOrigem=l.id===useLid;
+    return`<div class="distrib-row">
+      <div class="dr-name">${l.name}${isOrigem?' <span style="color:var(--amber);font-size:10px">(origem)</span>':''}</div>
+      <div style="display:flex;gap:16px;align-items:center">
+        <span style="font-size:11px;color:var(--text3)">prej. atual: R$${la.toFixed(2)}</span>
+        <span style="color:var(--accent2)">→</span>
+        <span class="dr-val">R$${novoPreju.toFixed(2)}</span>
+        <span style="font-size:10px;color:var(--text3)">stake ~R$${novaStake.toFixed(2)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('distribuirPreview').innerHTML=`
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Distribuição</div>
+    <div style="font-size:13px;color:var(--amber);margin-bottom:12px">
+      R$${lostAccum.toFixed(2)} ÷ ${nLinhas} linhas = <strong>R$${prejPorLinha.toFixed(2)} por linha</strong>
+    </div>
+    ${preview}
+  `;
+  document.getElementById('distribuirObs').innerHTML=
+    `⚠️ Esta operação <strong>zera o prejuízo da linha de origem</strong> e distribui um ajuste de prejuízo em cada linha. `+
+    `Os jogos existentes não são alterados — o ajuste é gravado como uma entrada especial de distribuição.`;
+
+  openModal('modalDistribuir');
+};
+
+window.confirmarDistribuir=async()=>{
+  if(!distribuirContext) return;
+  closeModal('modalDistribuir');
+  setStatus('saving');
+
+  try{
+    const{tid,lid,lostAccum,prejPorLinha,lines}=distribuirContext;
+    const lucro=config.lucro||20;
+
+    // Para cada linha: gravar um jogo especial de "ajuste" com won=false e stake=prejPorLinha
+    // Isso aumenta o lostAccum de cada linha em prejPorLinha
+    // A linha de origem recebe um ajuste de prejPorLinha (não zera — a soma fica lostAccum/N como as outras)
+    // Primeiro: gravar ajuste em TODAS as linhas (incluindo origem)
+    for(const l of lines){
+      const k=gkey(tid,l.id);
+      const games=(gamesMap[k]||[]).filter(g=>g.won!==null&&g.won!==undefined);
+      let laAtual=0;
+      games.forEach(g=>{if(g.won)laAtual=0;else laAtual=+(laAtual+g.stake).toFixed(2);});
+
+      if(l.id===lid){
+        // Linha de origem: gravar um jogo de "zerar" (won=true com lucro=0) + ajuste
+        // Estratégia: gravar entrada won=true com stake=lostAccum para zerar, depois gravar ajuste
+        await addDoc(G_COL(tid,l.id),{
+          data:'--',
+          jogador:'⚡ Distribuição (zerar)',
+          odd:2.00,
+          stake:+lostAccum.toFixed(2),
+          modo:'distrib-zerar',
+          won:true,
+          prejBefore:+laAtual.toFixed(2),
+          lucroAlvo:0,
+          recPctUsed:100,
+          isDistrib:true,
+          ts:serverTimestamp(),
+        });
+      }
+      // Todas as linhas recebem o ajuste de prejuízo
+      await addDoc(G_COL(tid,l.id),{
+        data:'--',
+        jogador:'⚡ Distribuição (+R$'+prejPorLinha.toFixed(2)+')',
+        odd:2.00,
+        stake:+prejPorLinha.toFixed(2),
+        modo:'distrib-ajuste',
+        won:false,
+        prejBefore:l.id===lid?0:+laAtual.toFixed(2),
+        lucroAlvo:lucro,
+        recPctUsed:100,
+        isDistrib:true,
+        ts:serverTimestamp(),
+      });
+    }
+
+    distribuirContext=null;
+    setStatus('synced');
+  }catch(e){
+    alert('Erro ao distribuir: '+e.message);
+    setStatus('offline');
+  }
+};
+
+window.setResult=async(tid,lid,gid,won)=>{
+  setStatus('saving');
+  try{
+    await updateDoc(gRef(tid,lid,gid),{won});
+    setStatus('synced');
+    // Verificar 3 reds consecutivos após salvar
+    setTimeout(()=>{
+      if(won===false && checkConsecReds(tid,lid)){
+        showAlert3Reds(tid,lid);
+      }
+    },600);
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+window.delGame=async(tid,lid,gid)=>{
+  if(!confirm('Remover este jogo?')) return;
+  setStatus('saving');
+  try{await deleteDoc(gRef(tid,lid,gid));setStatus('synced');}
+  catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+
+// ── UTILS ──
+function showDash(){currentTid=null;currentLid=null;renderSidebar();renderDash();}
+window.showDash=showDash;
+window.openModal=id=>document.getElementById(id).classList.add('open');
+window.closeModal=id=>document.getElementById(id).classList.remove('open');
+
+// ── RESET ──
+window.doReset=async()=>{
+  closeModal('modalReset');setStatus('saving');
+  try{
+    const ts=await getDocs(T_COL);
+    for(const td of ts.docs){
+      const ls=await getDocs(L_COL(td.id));
+      for(const ld of ls.docs){
+        const gs=await getDocs(G_COL(td.id,ld.id));
+        await Promise.all(gs.docs.map(g=>deleteDoc(g.ref)));
+        await deleteDoc(ld.ref);
+      }
+      await deleteDoc(td.ref);
+    }
+    const def={banca:1000,lucro:20,oddMin:1.50,oddMax:2.00};
+    await setDoc(CFG_REF,def);
+    config=def;applyConfigUI();
+    currentTid=null;currentLid=null;gamesMap={};linesMap={};
+    setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+
+// ── RECALC ──
+window.openRecalc=()=>{
+  document.getElementById('recalcInfo').innerHTML=
+    `% Recup.: <strong>${config.recPct??100}%</strong> · Lucro: <strong>R$${config.lucro}</strong>`;
+  openModal('modalRecalc');
+};
+window.doRecalc=async()=>{
+  closeModal('modalRecalc');setStatus('saving');
+  try{
+    const lucro=config.lucro||20;
+    const tids=currentTid?[currentTid]:tournaments.map(t=>t.id);
+    for(const tid of tids){
+      const lines=linesMap[tid]||[];
+      for(const l of lines){
+        const games=gamesMap[gkey(tid,l.id)]||[];
+        let la=0;
+        for(const g of games){
+          const isPend=g.won===null||g.won===undefined;
+          const stake=(la+lucro)/((g.odd||1.75)-1);
+          const modo=la===0?'normal':'recup';
+          await updateDoc(gRef(tid,l.id,g.id),{
+            stake:+stake.toFixed(2),
+            modo,
+            prejBefore:+la.toFixed(2),
+            lucroAlvo:lucro,
+            recPctUsed:100,
+          });
+          if(!isPend){
+            if(g.won) la=0;
+            else la=+(la+stake).toFixed(2);
+          }
+        }
+      }
+    }
+    setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+
+init();
+</script>
+</body>
+</html>
