@@ -780,8 +780,8 @@ function renderSidebar(){
         <div class="t-info">
           <div class="t-name" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
             <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</span>
-            <span style="font-family:var(--fh);font-size:11px;font-weight:700;color:${saldoPos?'var(--green)':'var(--red)'};flex-shrink:0;opacity:.7">
-              ${totalV+totalD>0?'R$'+(saldoPos?'+':'')+saldo.toFixed(2):'—'}
+            <span style="font-family:var(--fh);font-size:11px;font-weight:700;color:${saldoPosA?'var(--green)':'var(--red)'};flex-shrink:0;opacity:.7">
+              ${totalV+totalD>0?'R$'+(saldoPosA?'+':'')+saldoA.toFixed(2):'—'}
             </span>
           </div>
           <div class="t-meta">Arquivado · ${totalV}V ${totalD}D</div>
