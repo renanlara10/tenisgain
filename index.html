@@ -698,20 +698,33 @@ function renderAll(){
 }
 
 // ── SIDEBAR ──
-// Calcula saldo líquido real de um torneio somando lucros de todas as linhas
-// Ignora entradas de distribuição (isDistrib=true) — são ajustes internos, não movimentam banca real
+// Saldo real = banca do último jogo de cada linha − banca inicial
+// Usa a banca já calculada e gravada em cada jogo (campo banca não existe no Firestore,
+// então recalcula corretamente: banca inicial + soma de cada movimentação real)
 function calcTournamentSaldo(tid){
   const lines=linesMap[tid]||[];
-  let saldo=0;
+  const bancaInicial=config.banca||1000;
+  let saldoTotal=0;
+  let prejAberto=0;
   lines.forEach(l=>{
-    const games=(gamesMap[gkey(tid,l.id)]||[])
-      .filter(g=>g.won!==null&&g.won!==undefined&&!g.isDistrib);
-    games.forEach(g=>{
-      if(g.won) saldo=+(saldo+(g.lucroAlvo||config.lucro||20)).toFixed(2);
-      else saldo=+(saldo-g.stake).toFixed(2);
+    const allGames=(gamesMap[gkey(tid,l.id)]||[])
+      .filter(g=>g.won!==null&&g.won!==undefined);
+    if(!allGames.length) return;
+    // Calcular banca final desta linha aplicando cada jogo em ordem
+    // Entradas de distribuição: distrib-zerar não move banca real, distrib-ajuste não move banca real
+    // Apenas jogos reais (won true/false, !isDistrib) movimentam a banca
+    let banca=bancaInicial;
+    allGames.forEach(g=>{
+      if(g.isDistrib) return; // não move banca real
+      if(g.won) banca=+(banca-g.stake+g.stake*g.odd).toFixed(2);
+      else banca=+(banca-g.stake).toFixed(2);
     });
+    saldoTotal=+(saldoTotal+(banca-bancaInicial)).toFixed(2);
+    // Prejuízo em aberto
+    const{lostAccum}=calcNextStake(tid,l.id,0);
+    prejAberto=+(prejAberto+lostAccum).toFixed(2);
   });
-  return saldo;
+  return{saldo:saldoTotal, prejAberto};
 }
 
 function renderSidebar(){
@@ -734,10 +747,10 @@ function renderSidebar(){
         const gs=gamesMap[gkey(t.id,l.id)]||[];
         return s+gs.filter(g=>g.won===false).length;
       },0);
-      const saldo=calcTournamentSaldo(t.id);
+      const{saldo,prejAberto}=calcTournamentSaldo(t.id);
       const saldoPos=saldo>=0;
       const saldoStr=(saldoPos?'+':'')+saldo.toFixed(2);
-      const dot=totalPend>0?'amber':saldoPos?'green':'grey';
+      const dot=totalPend>0?'amber':saldoPos&&prejAberto===0?'green':'grey';
       return`<div class="t-item${currentTid===t.id?' active':''}" onclick="openTournament('${t.id}')">
         <div class="t-dot ${dot}"></div>
         <div class="t-info">
@@ -747,7 +760,7 @@ function renderSidebar(){
               ${totalV+totalD>0?'R$'+saldoStr:'—'}
             </span>
           </div>
-          <div class="t-meta">${lines.length} linha${lines.length!==1?'s':''} · ${totalV}V ${totalD}D${totalPend?' · ⏳'+totalPend:''}</div>
+          <div class="t-meta">${lines.length} linha${lines.length!==1?'s':''} · ${totalV}V ${totalD}D${totalPend?' · ⏳'+totalPend:''}${prejAberto>0?' · <span style="color:var(--amber)">⚠ R$'+prejAberto.toFixed(2)+' aberto</span>':''}</div>
         </div>
       </div>`;
     }).join('');
@@ -757,8 +770,8 @@ function renderSidebar(){
   if(arch.length){
     arcSec.style.display='block';
     document.getElementById('archivedList').innerHTML=arch.map(t=>{
-      const saldo=calcTournamentSaldo(t.id);
-      const saldoPos=saldo>=0;
+      const{saldo:saldoA,prejAberto:paA}=calcTournamentSaldo(t.id);
+      const saldoPosA=saldoA>=0;
       const lines=linesMap[t.id]||[];
       const totalV=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===true).length,0);
       const totalD=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===false).length,0);
