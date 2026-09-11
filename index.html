@@ -600,11 +600,12 @@ function calcLine(games, stakeBase){
     // Entradas de distribuição — ajuste direto no lostAccum
     if(g.isDistrib){
       if(g.modo==='distrib-zerar'){
-        // Zera o lostAccum da linha de origem
-        lostAccum=0;
-        return{...g,lucro:0,lostAfter:0,pending:false,distribEntry:true};
+        // Subtrai apenas o valor que foi distribuído (stake = totalDist gravado)
+        // Os % restantes continuam acumulados na linha de origem
+        lostAccum=+Math.max(0,lostAccum-stake).toFixed(2);
+        return{...g,lucro:0,lostAfter:lostAccum,pending:false,distribEntry:true};
       }else if(g.modo==='distrib-ajuste'){
-        // Adiciona o prejuízo distribuído
+        // Adiciona o prejuízo distribuído recebido de outra linha
         lostAccum=+(lostAccum+stake).toFixed(2);
         if(lostAccum>maxLost) maxLost=lostAccum;
         return{...g,lucro:-stake,lostAfter:lostAccum,pending:false,distribEntry:true};
