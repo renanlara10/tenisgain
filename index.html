@@ -341,7 +341,7 @@ tr:last-child td{border-bottom:none;}
       <div class="seq-panel" id="seqPanel">
         <div class="seq-header">
           <span class="seq-title">SEQUÊNCIA DE RESULTADOS</span>
-          <span class="seq-sub">mais recente primeiro →</span>
+          <span class="seq-sub">← mais antigo · mais recente →</span>
         </div>
         <div class="seq-table-wrap">
           <table class="seq-table" id="seqTable"></table>
@@ -977,7 +977,6 @@ function renderSeqPanel(tid){
     const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
     const totV=settled.filter(g=>g.won===true).length;
     const totD=settled.filter(g=>g.won===false).length;
-    const cells=getStreaks(games);
 
     html+=`<tr>
       <td class="seq-row-label">
@@ -985,18 +984,20 @@ function renderSeqPanel(tid){
         <div class="seq-row-sub">${totV}V ${totD}D</div>
       </td>`;
 
-    // Células do mais recente para o mais antigo
-    for(let i=0;i<maxGames;i++){
-      if(i<cells.length){
-        const c=cells[i];
-        const tip=`${c.jogador||'—'} · odd ${c.odd?.toFixed(2)||'—'} · R$${c.stake?.toFixed(2)||'—'}`;
-        html+=`<td class="seq-cell ${c.res}">
-          ${c.streak}
-          <div class="seq-tooltip">${tip}</div>
-        </td>`;
-      }else{
-        html+=`<td></td>`;
-      }
+    // Processar do mais antigo → mais recente, exibir da esquerda → direita
+    const cells=getStreaks([...games].reverse());
+    const padLeft=maxGames-cells.length;
+    // Células vazias à esquerda para alinhar à direita
+    for(let i=0;i<padLeft;i++){
+      html+=`<td></td>`;
+    }
+    for(let i=cells.length-1;i>=0;i--){
+      const c=cells[i];
+      const tip=`${c.jogador||'—'} · odd ${c.odd?.toFixed(2)||'—'} · R$${c.stake?.toFixed(2)||'—'}`;
+      html+=`<td class="seq-cell ${c.res}">
+        ${c.streak}
+        <div class="seq-tooltip">${tip}</div>
+      </td>`;
     }
     html+='</tr>';
   });
