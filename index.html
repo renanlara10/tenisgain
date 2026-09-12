@@ -209,7 +209,23 @@ tr:last-child td{border-bottom:none;}
 .mf input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--text);font-family:var(--fm);outline:none;}
 .mf input:focus{border-color:var(--accent);}
 
-/* WARN / EMPTY */
+/* PAINEL SEQUÊNCIA */
+.seq-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:14px;overflow:hidden;}
+.seq-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);}
+.seq-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);}
+.seq-sub{font-size:10px;color:var(--text3);}
+.seq-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 14px;}
+.seq-table{border-collapse:separate;border-spacing:3px;}
+.seq-table td{padding:0;}
+.seq-row-label{white-space:nowrap;padding-right:8px !important;vertical-align:middle;}
+.seq-row-name{font-size:10px;font-weight:700;color:var(--text2);line-height:1.2;}
+.seq-row-sub{font-size:9px;color:var(--text3);}
+.seq-cell{width:22px;height:22px;border-radius:4px;text-align:center;vertical-align:middle;font-size:10px;font-weight:700;cursor:default;position:relative;}
+.seq-cell.gain{background:#166534;color:#4ade80;}
+.seq-cell.loss{background:#7f1d1d;color:#f87171;}
+.seq-cell.pend{background:#3a2e10;color:#fb923c;}
+.seq-cell:hover .seq-tooltip{display:block;}
+.seq-tooltip{display:none;position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:#1e2026;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:10px;color:var(--text);white-space:nowrap;z-index:99;pointer-events:none;}
 .warn-box{border:1px solid var(--amber);border-left:3px solid var(--amber);border-radius:var(--r);padding:12px 16px;margin-top:12px;font-size:12px;background:#1a1208;color:var(--amber);line-height:1.7;}
 .empty{text-align:center;padding:32px 20px;color:var(--text3);}
 .empty .ei{font-size:26px;margin-bottom:8px;}
@@ -319,6 +335,17 @@ tr:last-child td{border-bottom:none;}
         </div>
         <button class="btn-archive" id="btnArchive" onclick="toggleArchive()">Arquivar</button>
         <button class="btn-del-t" id="btnDelT" onclick="askDelTournament()">🗑 Excluir</button>
+      </div>
+
+      <!-- PAINEL SEQUÊNCIA -->
+      <div class="seq-panel" id="seqPanel">
+        <div class="seq-header">
+          <span class="seq-title">SEQUÊNCIA DE RESULTADOS</span>
+          <span class="seq-sub">mais recente primeiro →</span>
+        </div>
+        <div class="seq-table-wrap">
+          <table class="seq-table" id="seqTable"></table>
+        </div>
       </div>
 
       <!-- LINES TABS -->
@@ -901,7 +928,81 @@ function renderDash(){
   });
 }
 
-// ── TOURNAMENT DETAIL ──
+function renderSeqPanel(tid){
+  const lines=linesMap[tid]||[];
+  if(!lines.length){
+    document.getElementById('seqPanel').style.display='none';
+    return;
+  }
+  document.getElementById('seqPanel').style.display='block';
+
+  // Coletar jogos reais de cada linha (mais recente primeiro)
+  const lineData=lines.map(l=>{
+    const k=gkey(tid,l.id);
+    const games=(gamesMap[k]||[])
+      .filter(g=>!g.isDistrib)
+      .slice() // não mutar
+      .reverse(); // mais recente primeiro
+    return{l,games};
+  });
+
+  // Número máximo de jogos entre todas as linhas
+  const maxGames=Math.max(...lineData.map(d=>d.games.length),0);
+  if(!maxGames){
+    document.getElementById('seqPanel').style.display='none';
+    return;
+  }
+
+  // Calcular streak: número consecutivo de wins/losses por jogo
+  // Para cada linha, processar do mais recente ao mais antigo
+  function getStreaks(games){
+    const cells=[];
+    let streak=0, lastResult=null;
+    for(const g of games){
+      const res=g.won===true?'gain':g.won===false?'loss':'pend';
+      if(res===lastResult||lastResult===null){
+        streak++;
+      }else{
+        streak=1;
+      }
+      lastResult=res;
+      cells.push({res,streak,jogador:g.jogador,odd:g.odd,stake:g.stake});
+    }
+    return cells;
+  }
+
+  let html='<tbody>';
+  lineData.forEach(({l,games})=>{
+    const k=gkey(tid,l.id);
+    const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
+    const totV=settled.filter(g=>g.won===true).length;
+    const totD=settled.filter(g=>g.won===false).length;
+    const cells=getStreaks(games);
+
+    html+=`<tr>
+      <td class="seq-row-label">
+        <div class="seq-row-name">${l.name}</div>
+        <div class="seq-row-sub">${totV}V ${totD}D</div>
+      </td>`;
+
+    // Células do mais recente para o mais antigo
+    for(let i=0;i<maxGames;i++){
+      if(i<cells.length){
+        const c=cells[i];
+        const tip=`${c.jogador||'—'} · odd ${c.odd?.toFixed(2)||'—'} · R$${c.stake?.toFixed(2)||'—'}`;
+        html+=`<td class="seq-cell ${c.res}">
+          ${c.streak}
+          <div class="seq-tooltip">${tip}</div>
+        </td>`;
+      }else{
+        html+=`<td></td>`;
+      }
+    }
+    html+='</tr>';
+  });
+  html+='</tbody>';
+  document.getElementById('seqTable').innerHTML=html;
+}
 function openTournament(tid){
   currentTid=tid;
   const lines=linesMap[tid]||[];
@@ -921,6 +1022,9 @@ function renderDetail(tid){
   const ab=document.getElementById('btnArchive');
   ab.textContent=t.archived?'Desarquivar':'Arquivar';
   ab.className=t.archived?'btn-archive btn-unarchive':'btn-archive';
+
+  // Painel sequência
+  renderSeqPanel(tid);
 
   // Lines tabs
   const lines=linesMap[tid]||[];
@@ -1205,6 +1309,10 @@ window.createTournament=async()=>{
   setStatus('saving');
   try{
     const ref=await addDoc(T_COL,{name,meta,archived:false,ts:serverTimestamp()});
+    // Criar 5 linhas automaticamente
+    for(let i=1;i<=5;i++){
+      await addDoc(L_COL(ref.id),{name:`Linha ${i}`,ts:serverTimestamp()});
+    }
     closeModal('modalNewT');
     document.getElementById('newTName').value='';
     document.getElementById('newTMeta').value='';
