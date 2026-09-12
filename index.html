@@ -42,7 +42,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100
 .t-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:background .15s;margin-bottom:3px;border:1px solid transparent;}
 .t-item:hover{background:var(--surface2);}
 .t-item.active{background:var(--surface2);border-color:var(--accent);}
-.t-item.archived{opacity:.45;}
+/* ARQUIVADOS — compacto e colapsável */
+.arch-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 0;user-select:none;}
+.arch-toggle:hover .arch-label{color:var(--text2);}
+.arch-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);transition:color .15s;}
+.arch-arrow{font-size:10px;color:var(--text3);transition:transform .2s;}
+.arch-arrow.open{transform:rotate(180deg);}
+.arch-list{overflow:hidden;transition:max-height .25s ease;}
+.t-item.archived{opacity:1;padding:5px 8px;margin-bottom:2px;}
+.t-item.archived .t-dot{width:6px;height:6px;flex-shrink:0;}
+.t-item.archived .t-name span:first-child{font-size:11px;color:var(--text3);}
+.t-item.archived .t-meta{display:none;}
 .t-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 .t-dot.green{background:var(--green);}
 .t-dot.amber{background:var(--amber);}
@@ -255,8 +265,11 @@ tr:last-child td{border-bottom:none;}
       <button class="btn-new-t" onclick="openModal('modalNewT')">+ Novo torneio</button>
     </div>
     <div class="sb-sec" id="archivedSec" style="display:none">
-      <div class="sb-title">📁 Arquivados</div>
-      <div id="archivedList"></div>
+      <div class="arch-toggle" onclick="toggleArchivedList()">
+        <span class="arch-label">📁 Arquivados <span id="archCount" style="color:var(--text3);font-weight:400"></span></span>
+        <span class="arch-arrow" id="archArrow">▼</span>
+      </div>
+      <div class="arch-list" id="archivedList" style="max-height:0"></div>
     </div>
     <div class="sb-sec">
       <div class="sb-title">⚙ Parâmetros globais</div>
@@ -366,6 +379,7 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="modalReset">
   <div class="modal">
     <h3>Resetar tudo?</h3>
     <p>Todos os torneios, linhas e jogos serão apagados permanentemente.</p>
@@ -728,8 +742,21 @@ function calcTournamentSaldo(tid){
   return{saldo:saldoTotal, prejAberto};
 }
 
+let archOpen=false;
+window.toggleArchivedList=function(){
+  archOpen=!archOpen;
+  const list=document.getElementById('archivedList');
+  const arrow=document.getElementById('archArrow');
+  if(archOpen){
+    list.style.maxHeight=list.scrollHeight+'px';
+    arrow.classList.add('open');
+  }else{
+    list.style.maxHeight='0';
+    arrow.classList.remove('open');
+  }
+};
+
 function renderSidebar(){
-  const active=tournaments.filter(t=>!t.archived);
   const arch=tournaments.filter(t=>t.archived);
   const listEl=document.getElementById('tournamentList');
   if(!active.length){
@@ -770,25 +797,30 @@ function renderSidebar(){
   const arcSec=document.getElementById('archivedSec');
   if(arch.length){
     arcSec.style.display='block';
+    document.getElementById('archCount').textContent='('+arch.length+')';
     document.getElementById('archivedList').innerHTML=arch.map(t=>{
-      const{saldo:saldoA,prejAberto:paA}=calcTournamentSaldo(t.id);
+      const{saldo:saldoA}=calcTournamentSaldo(t.id);
       const saldoPosA=saldoA>=0;
       const lines=linesMap[t.id]||[];
-      const totalV=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===true).length,0);
-      const totalD=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===false).length,0);
+      const totalV=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===true&&!g.isDistrib).length,0);
+      const totalD=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===false&&!g.isDistrib).length,0);
       return`<div class="t-item archived${currentTid===t.id?' active':''}" onclick="openTournament('${t.id}')">
         <div class="t-dot grey"></div>
-        <div class="t-info">
+        <div class="t-info" style="width:100%">
           <div class="t-name" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</span>
-            <span style="font-family:var(--fh);font-size:11px;font-weight:700;color:${saldoPosA?'var(--green)':'var(--red)'};flex-shrink:0;opacity:.7">
-              ${totalV+totalD>0?'R$'+(saldoPosA?'+':'')+saldoA.toFixed(2):'—'}
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--text3)">${t.name}</span>
+            <span style="font-size:11px;font-weight:700;color:${saldoPosA?'var(--green)':'var(--red)'};flex-shrink:0;opacity:.8">
+              ${totalV+totalD>0?(saldoPosA?'+':'')+saldoA.toFixed(0):'—'}
             </span>
           </div>
-          <div class="t-meta">Arquivado · ${totalV}V ${totalD}D</div>
         </div>
       </div>`;
     }).join('');
+    // Atualizar altura se estiver aberto
+    if(archOpen){
+      const list=document.getElementById('archivedList');
+      list.style.maxHeight=list.scrollHeight+'px';
+    }
   }else{arcSec.style.display='none';}
 }
 
@@ -1012,8 +1044,11 @@ function renderLine(tid,lid,isArchived){
       <th>#</th><th>Data</th><th>Jogador</th><th>Odd</th><th>Modo</th>
       <th>Stake</th><th>Prej. antes</th><th>Resultado</th><th>Lucro/Perda</th><th>Prej. após</th><th>Banca</th><th></th>
     </tr></thead><tbody>`;
+    const realRows=rows.filter(r=>!r.distribEntry);
+    const totalReal=realRows.length;
+    let realCount=totalReal;
     [...rows].reverse().forEach((r,i)=>{
-      const num=rows.length-i;
+      const num=r.distribEntry?'—':realCount--;
       if(r.distribEntry){
         html+=`<tr style="background:#0e1a1a;opacity:.7">
           <td style="color:var(--text3)">${num}</td>
