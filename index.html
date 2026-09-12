@@ -757,6 +757,7 @@ window.toggleArchivedList=function(){
 };
 
 function renderSidebar(){
+  const active=tournaments.filter(t=>!t.archived);
   const arch=tournaments.filter(t=>t.archived);
   const listEl=document.getElementById('tournamentList');
   if(!active.length){
