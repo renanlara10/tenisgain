@@ -856,12 +856,27 @@ function renderDash(){
         const midOdd=(config.oddMin+config.oddMax)/2;
         const nextS=(lostAccum+lucro)/(midOdd-1);
         const lPend=games.filter(g=>g.won===null||g.won===undefined).length;
+        // Saldo líquido: banca final − banca inicial (ignorando distribuições)
+        const bancaInicial=config.banca||1000;
+        let bancaFinal=bancaInicial;
+        settled.forEach(g=>{
+          if(g.isDistrib) return;
+          if(g.won) bancaFinal=+(bancaFinal-g.stake+g.stake*g.odd).toFixed(2);
+          else bancaFinal=+(bancaFinal-g.stake).toFixed(2);
+        });
+        const saldoL=+(bancaFinal-bancaInicial).toFixed(2);
+        const saldoPos=saldoL>=0;
         return`<div class="tc-line">
           <div>
             <div class="tl-name">${l.name}${lPend?` <span style="color:var(--amber)">⏳${lPend}</span>`:''}</div>
             <div class="tl-info">${totV}V ${totD}D${lostAccum>0?` · prej. <span style="color:var(--amber)">R$${lostAccum.toFixed(0)}</span>`:''}</div>
           </div>
-          <div class="tl-stake" style="color:${lostAccum>0?'var(--amber)':'var(--accent)'}">R$${nextS.toFixed(0)}</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;font-weight:600;color:${saldoPos?'var(--green)':'var(--red)'}">
+              ${saldoPos?'+':''}R$${saldoL.toFixed(0)}
+            </span>
+            <div class="tl-stake" style="color:${lostAccum>0?'var(--amber)':'var(--accent)'}">R$${nextS.toFixed(0)}</div>
+          </div>
         </div>`;
       }).join('');
       return`<div class="t-card${pend?' has-pending':''}" onclick="openTournament('${t.id}')">
