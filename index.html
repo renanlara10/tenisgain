@@ -215,7 +215,7 @@ tr:last-child td{border-bottom:none;}
 .seq-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);}
 .seq-sub{font-size:10px;color:var(--text3);}
 .seq-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 14px;}
-.seq-table{border-collapse:separate;border-spacing:3px;}
+.seq-table{border-collapse:separate;border-spacing:3px;width:auto;table-layout:fixed;}
 .seq-table td{padding:0;}
 .seq-row-label{white-space:nowrap;padding-right:8px !important;vertical-align:middle;}
 .seq-row-name{font-size:10px;font-weight:700;color:var(--text2);line-height:1.2;}
@@ -984,13 +984,10 @@ function renderSeqPanel(tid){
         <div class="seq-row-sub">${totV}V ${totD}D</div>
       </td>`;
 
-    // games já vem do mais recente ao mais antigo (ordem Firestore invertida)
-    // Reverter para ter mais antigo primeiro → exibir esquerda→direita
     const gamesOldFirst=[...games].reverse();
     const cells=getStreaks(gamesOldFirst);
-    const padLeft=maxGames-cells.length;
 
-    // Células da esquerda para direita: índice 0 = mais antigo, último = mais recente
+    // Células da esquerda para direita: mais antigo → mais recente
     for(let i=0;i<cells.length;i++){
       const c=cells[i];
       const tip=`${c.jogador||'—'} · odd ${c.odd?.toFixed(2)||'—'} · R$${c.stake?.toFixed(2)||'—'}`;
@@ -998,11 +995,6 @@ function renderSeqPanel(tid){
         ${c.streak}
         <div class="seq-tooltip">${tip}</div>
       </td>`;
-    }
-    // Células vazias à direita (espaço para novos jogos)
-    const padRight=maxGames-cells.length;
-    for(let i=0;i<padRight;i++){
-      html+=`<td></td>`;
     }
     html+='</tr>';
   });
