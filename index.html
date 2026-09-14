@@ -990,10 +990,6 @@ function renderSeqPanel(tid){
     const cells=getStreaks(gamesOldFirst);
     const padLeft=maxGames-cells.length;
 
-    // Células vazias à esquerda (linhas com menos jogos)
-    for(let i=0;i<padLeft;i++){
-      html+=`<td></td>`;
-    }
     // Células da esquerda para direita: índice 0 = mais antigo, último = mais recente
     for(let i=0;i<cells.length;i++){
       const c=cells[i];
@@ -1002,6 +998,11 @@ function renderSeqPanel(tid){
         ${c.streak}
         <div class="seq-tooltip">${tip}</div>
       </td>`;
+    }
+    // Células vazias à direita (espaço para novos jogos)
+    const padRight=maxGames-cells.length;
+    for(let i=0;i<padRight;i++){
+      html+=`<td></td>`;
     }
     html+='</tr>';
   });
