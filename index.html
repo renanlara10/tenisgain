@@ -341,7 +341,7 @@ tr:last-child td{border-bottom:none;}
       <div class="seq-panel" id="seqPanel">
         <div class="seq-header">
           <span class="seq-title">SEQUÊNCIA DE RESULTADOS</span>
-          <span class="seq-sub">← mais antigo · mais recente →</span>
+          <span class="seq-sub">mais antigo → mais recente</span>
         </div>
         <div class="seq-table-wrap">
           <table class="seq-table" id="seqTable"></table>
@@ -984,14 +984,18 @@ function renderSeqPanel(tid){
         <div class="seq-row-sub">${totV}V ${totD}D</div>
       </td>`;
 
-    // Processar do mais antigo → mais recente, exibir da esquerda → direita
-    const cells=getStreaks([...games].reverse());
+    // games já vem do mais recente ao mais antigo (ordem Firestore invertida)
+    // Reverter para ter mais antigo primeiro → exibir esquerda→direita
+    const gamesOldFirst=[...games].reverse();
+    const cells=getStreaks(gamesOldFirst);
     const padLeft=maxGames-cells.length;
-    // Células vazias à esquerda para alinhar à direita
+
+    // Células vazias à esquerda (linhas com menos jogos)
     for(let i=0;i<padLeft;i++){
       html+=`<td></td>`;
     }
-    for(let i=cells.length-1;i>=0;i--){
+    // Células da esquerda para direita: índice 0 = mais antigo, último = mais recente
+    for(let i=0;i<cells.length;i++){
       const c=cells[i];
       const tip=`${c.jogador||'—'} · odd ${c.odd?.toFixed(2)||'—'} · R$${c.stake?.toFixed(2)||'—'}`;
       html+=`<td class="seq-cell ${c.res}">
