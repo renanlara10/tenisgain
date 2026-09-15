@@ -1221,25 +1221,27 @@ function renderLine(tid,lid,isArchived){
             <button class="btn-gain-t" onclick="setResult(this,true)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✔ Gain</button>
             <button class="btn-loss-t" onclick="setResult(this,false)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✘ Loss</button>
           </div></td>
+          <td>—</td><td>—</td><td>—</td>
           <td><button class="edit-btn" onclick="openEditGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✏️</button><button class="del-btn" onclick="delGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✕</button></td>
         </tr>`;
+      }else{
         html+=`<tr class="${r.won?'wr':'lr'}">
           <td style="color:var(--text3)">${num}</td>
           <td style="color:var(--text2)">${r.data||'—'}</td>
           <td style="font-weight:500">${r.jogador}</td>
           <td style="font-weight:700;color:var(--accent)">${r.odd?.toFixed(2)}</td>
-          <td>${r.modo==='normal'
-            ?'<span class="pill pn">Base</span>'
-            :'<span class="pill pr2">↩ '+(r.recPctUsed&&r.recPctUsed<100?r.recPctUsed+'%':'Recup.')+'</span>'
-          }</td>
+          <td>${r.modo==='normal'?'<span class="pill pn">Base</span>':('<span class="pill pr2">↩ '+(r.recPctUsed&&r.recPctUsed<100?r.recPctUsed+'%':'Recup.')+'</span>')}</td>
           <td>R$${r.stake?.toFixed(2)}</td>
-          <td>${r.prejBefore>0?`<span style="color:var(--amber)">R$${r.prejBefore?.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+          <td>${r.prejBefore>0?'<span style="color:var(--amber)">R$'+r.prejBefore?.toFixed(2)+'</span>':'<span style="color:var(--text3)">—</span>'}</td>
           <td>${r.won?'<span class="pill pw">✔ Gain</span>':'<span class="pill pl">✘ Loss</span>'}</td>
           <td>${r.won?('<span style="color:var(--green)">+R$'+r.lucro?.toFixed(2)+'</span>'):('<span style="color:var(--red)">-R$'+r.stake?.toFixed(2)+'</span>')}</td>
-          <td>${r.lostAfter>0?('<span style="color:var(--amber)">R$'+r.lostAfter?.toFixed(2)+'</span>'):'<span style="color:var(--text3)">—</span>'}</td>
+          <td>${r.lostAfter>0?'<span style="color:var(--amber)">R$'+r.lostAfter?.toFixed(2)+'</span>':'<span style="color:var(--text3)">—</span>'}</td>
           <td style="font-weight:700;color:${(r.banca||0)>=config.banca?'var(--green)':'var(--red)'}">R$${r.banca?.toFixed(2)}</td>
           <td><button class="edit-btn" onclick="openEditGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✏️</button><button class="del-btn" onclick="delGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✕</button></td>
         </tr>`;
+      }
+    });
+    html+=`</tbody></table></div>`;
   }
 
   if(lostAccum>0){
