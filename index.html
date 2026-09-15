@@ -835,7 +835,7 @@ function renderSidebar(){
       const saldoPos=saldo>=0;
       const saldoStr=(saldoPos?'+':'')+saldo.toFixed(2);
       const dot=totalPend>0?'amber':saldoPos&&prejAberto===0?'green':'grey';
-      return`<div class="t-item${currentTid===t.id?' active':''}" onclick="openTournament(\"${t.id}\")">
+      return`<div class="t-item${currentTid===t.id?" active":""}" onclick="openTournament(this)" data-tid="${t.id}">
         <div class="t-dot ${dot}"></div>
         <div class="t-info">
           <div class="t-name" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
@@ -860,7 +860,7 @@ function renderSidebar(){
       const lines=linesMap[t.id]||[];
       const totalV=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===true&&!g.isDistrib).length,0);
       const totalD=lines.reduce((s,l)=>s+(gamesMap[gkey(t.id,l.id)]||[]).filter(g=>g.won===false&&!g.isDistrib).length,0);
-      return`<div class="t-item archived${currentTid===t.id?' active':''}" onclick="openTournament(\"${t.id}\")">
+      return`<div class="t-item archived${currentTid===t.id?" active":""}" onclick="openTournament(this)" data-tid="${t.id}">
         <div class="t-dot grey"></div>
         <div class="t-info" style="width:100%">
           <div class="t-name" style="display:flex;align-items:center;justify-content:space-between;gap:6px">
@@ -923,8 +923,8 @@ function renderDash(){
         const saldoPos=saldoL>=0;
         return`<div class="tc-line">
           <div>
-            <div class="tl-name">${l.name}${lPend?` <span style="color:var(--amber)">⏳${lPend}</span>`:''}</div>
-            <div class="tl-info">${totV}V ${totD}D${lostAccum>0?` · prej. <span style="color:var(--amber)">R$${lostAccum.toFixed(0)}</span>`:''}</div>
+            <div class="tl-name">${l.name}${lPend?('<span style="color:var(--amber)">⏳'+lPend+'</span>'):''}</div>
+            <div class="tl-info">${totV}V ${totD}D${lostAccum>0?(' · prej. <span style="color:var(--amber)">R$'+lostAccum.toFixed(0)+'</span>'):''}</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:11px;font-weight:600;color:${saldoPos?'var(--green)':'var(--red)'}">
@@ -934,7 +934,7 @@ function renderDash(){
           </div>
         </div>`;
       }).join('');
-      return`<div class="t-card${pend?' has-pending':''}" onclick="openTournament(\"${t.id}\")">
+      return`<div class="t-card${pend?" has-pending":""}" onclick="openTournament(this)" data-tid="${t.id}">
         <div class="tc-name">${t.name}</div>
         <div class="tc-sub">${t.meta||''} · ${lines.length} linha${lines.length!==1?'s':''}</div>
         <div class="tc-lines">${linesHtml||'<div style="font-size:11px;color:var(--text3)">Sem linhas — clique para adicionar</div>'}</div>
@@ -1029,7 +1029,8 @@ function renderSeqPanel(tid){
   html+='</tbody>';
   document.getElementById('seqTable').innerHTML=html;
 }
-function openTournament(tid){
+function openTournament(elOrId){
+  const tid=elOrId&&elOrId.dataset?elOrId.dataset.tid:elOrId;
   currentTid=tid;
   const lines=linesMap[tid]||[];
   if(lines.length>0 && !currentLid) currentLid=lines[0].id;
@@ -1059,13 +1060,13 @@ function renderDetail(tid){
     const k=gkey(tid,l.id);
     const pend=(gamesMap[k]||[]).some(g=>g.won===null||g.won===undefined);
     const isAct=currentLid===l.id;
-    return`<button class="line-tab${isAct?' active':''}${pend?' has-pending':''}" onclick="openLine(\"${l.id}\")">
+    return`<button class="line-tab${isAct?" active":""}${pend?" has-pending":""}" onclick="openLine(this)" data-lid="${l.id}">
       ${l.name}
     </button>`;
   }).join('');
 
   if(!t.archived){
-    bar.innerHTML+=`<button class="btn-new-line" onclick="openModal('modalNewL')">+ Linha</button>`;
+    bar.innerHTML+=`<button class="btn-new-line" onclick="openModal(&quot;modalNewL&quot;)">+ Linha</button>`;
   }
 
   // Line content
@@ -1078,8 +1079,8 @@ function renderDetail(tid){
   }
 }
 
-function openLine(lid){
-  currentLid=lid;
+function openLine(elOrId){
+  currentLid=elOrId&&elOrId.dataset?elOrId.dataset.lid:elOrId;
   renderDetail(currentTid);
 }
 window.openLine=openLine;
@@ -1099,7 +1100,7 @@ function renderLine(tid,lid,isArchived){
       <span style="font-size:11px;color:var(--text3)">Lucro alvo:</span>
       <span style="font-family:var(--fh);font-size:16px;font-weight:700;color:var(--accent)">R$${(config.lucro||20).toFixed(2)}/jogo</span>
     </div>
-    ${!isArchived?`<button class="btn-del-line" onclick="askDelLine(\"${tid}\",\"${lid}\")">🗑 Excluir linha</button>`:''}
+    ${!isArchived?`<button class="btn-del-line" onclick="askDelLine(this)" data-tid="${tid}" data-lid="${lid}">🗑 Excluir linha</button>`:''}
   </div>`;
 
   if(!isArchived){
@@ -1113,9 +1114,9 @@ function renderLine(tid,lid,isArchived){
         <div class="ff"><label>Odd</label><input type="number" id="fOdd_${lid}" placeholder="1.50" min="1.01" step="0.01" oninput="updateNB('${tid}','${lid}')"></div>
         <div class="ff"><label>Resultado</label>
           <div class="btn-row">
-            <button class="btn btn-amber" id="btnP_${lid}" onclick="addGame(\"${tid}\",\"${lid}\",null)">⏳</button>
-            <button class="btn btn-green" id="btnW_${lid}" onclick="addGame(\"${tid}\",\"${lid}\",true)">✔ Gain</button>
-            <button class="btn btn-red"   id="btnL_${lid}" onclick="addGame(\"${tid}\",\"${lid}\",false)">✘ Loss</button>
+            <button class="btn btn-amber" id="btnP_${lid}" onclick="addGame(this,null)" data-tid="${tid}" data-lid="${lid}">⏳</button>
+            <button class="btn btn-green" id="btnW_${lid}" onclick="addGame(this,true)" data-tid="${tid}" data-lid="${lid}">✔ Gain</button>
+            <button class="btn btn-red"   id="btnL_${lid}" onclick="addGame(this,false)" data-tid="${tid}" data-lid="${lid}">✘ Loss</button>
           </div>
         </div>
       </div>
@@ -1169,8 +1170,8 @@ function renderLine(tid,lid,isArchived){
         <div><div class="pc-name">${p.jogador}</div><div class="pc-det">${p.data||'—'} · Odd <strong>${p.odd?.toFixed(2)}</strong> · Stake R$${p.stake?.toFixed(2)} · Lucro alvo R$${p.lucroAlvo||config.lucro||20}</div></div>
         <div class="pc-stake">R$${p.stake?.toFixed(2)}</div>
         <div class="pc-btns">
-          <button class="btn-gain-t" onclick="setResult(\"${tid}\",\"${lid}\",\"${p.id}\",true)">✔ Gain</button>
-          <button class="btn-loss-t" onclick="setResult(\"${tid}\",\"${lid}\",\"${p.id}\",false)">✘ Loss</button>
+          <button class="btn-gain-t" onclick="setResult(this,true)" data-tid="${tid}" data-lid="${lid}" data-gid="${p.id}">✔ Gain</button>
+          <button class="btn-loss-t" onclick="setResult(this,false)" data-tid="${tid}" data-lid="${lid}" data-gid="${p.id}">✘ Loss</button>
         </div>
       </div>`).join('')}
       </div>
@@ -1205,7 +1206,7 @@ function renderLine(tid,lid,isArchived){
           <td><span class="pill" style="background:#0a2020;color:var(--accent2);border:1px solid var(--accent2)">⚡ Distrib.</span></td>
           <td colspan="2" style="color:var(--text3)">—</td>
           <td style="color:var(--text3)">R$${r.banca?.toFixed(2)}</td>
-          <td><button class="del-btn" onclick="delGame(\"${tid}\",\"${lid}\",\"${r.id}\")">✕</button></td>
+          <td><button class="del-btn" onclick="delGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✕</button></td>
         </tr>`;
       }else if(r.pending){
         html+=`<tr class="pr">
@@ -1217,8 +1218,8 @@ function renderLine(tid,lid,isArchived){
           <td style="color:var(--amber)">R$${r.stake?.toFixed(2)}</td>
           <td>${r.prejBefore>0?'<span style="color:var(--amber)">R$'+r.prejBefore?.toFixed(2)+'</span>':'—'}</td>
           <td><div style="display:flex;gap:6px">
-            <button class="btn-gain-t" onclick="setResult(\"${tid}\",\"${lid}\",\"${r.id}\",true)">✔ Gain</button>
-            <button class="btn-loss-t" onclick="setResult(\"${tid}\",\"${lid}\",\"${r.id}\",false)">✘ Loss</button>
+            <button class="btn-gain-t" onclick="setResult(this,true)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✔ Gain</button>
+            <button class="btn-loss-t" onclick="setResult(this,false)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✘ Loss</button>
           </div></td>
           <td><button class="edit-btn" onclick="openEditGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✏️</button><button class="del-btn" onclick="delGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✕</button></td>
         </tr>`;
@@ -1234,8 +1235,8 @@ function renderLine(tid,lid,isArchived){
           <td>R$${r.stake?.toFixed(2)}</td>
           <td>${r.prejBefore>0?`<span style="color:var(--amber)">R$${r.prejBefore?.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
           <td>${r.won?'<span class="pill pw">✔ Gain</span>':'<span class="pill pl">✘ Loss</span>'}</td>
-          <td>${r.won?`<span style="color:var(--green)">+R$${r.lucro?.toFixed(2)}</span>`:`<span style="color:var(--red)">-R$${r.stake?.toFixed(2)}</span>`}</td>
-          <td>${r.lostAfter>0?`<span style="color:var(--amber)">R$${r.lostAfter?.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+          <td>${r.won?('<span style="color:var(--green)">+R$'+r.lucro?.toFixed(2)+'</span>'):('<span style="color:var(--red)">-R$'+r.stake?.toFixed(2)+'</span>')}</td>
+          <td>${r.lostAfter>0?('<span style="color:var(--amber)">R$'+r.lostAfter?.toFixed(2)+'</span>'):'<span style="color:var(--text3)">—</span>'}</td>
           <td style="font-weight:700;color:${(r.banca||0)>=config.banca?'var(--green)':'var(--red)'}">R$${r.banca?.toFixed(2)}</td>
           <td><button class="edit-btn" onclick="openEditGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✏️</button><button class="del-btn" onclick="delGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✕</button></td>
         </tr>`;
@@ -1251,13 +1252,13 @@ function renderLine(tid,lid,isArchived){
           <div class="ar-stakes">Próxima stake (${(config.oddMin+config.oddMax)/2} avg): <strong>R$${((lostAccum+(config.lucro||20))/((config.oddMin+config.oddMax)/2-1)).toFixed(2)}</strong></div>
         </div>
         <div class="ar-actions">
-          <button class="btn-distrib" onclick="openDistribuir(\"${tid}\",\"${lid}\")">⚡ Distribuir prejuízo</button>
+          <button class="btn-distrib" onclick="openDistribuir(this)" data-tid="${tid}" data-lid="${lid}">⚡ Distribuir prejuízo</button>
         </div>
       </div>`;
     }else{
       html+=`<div class="warn-box" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <span>⚠️ Prejuízo em aberto: <strong>R$${lostAccum.toFixed(2)}</strong></span>
-        <button class="btn-distrib" style="font-size:11px;padding:6px 12px" onclick="openDistribuir(\"${tid}\",\"${lid}\")">⚡ Distribuir</button>
+        <button class="btn-distrib" style="font-size:11px;padding:6px 12px" onclick="openDistribuir(this)" data-tid="${tid}" data-lid="${lid}">⚡ Distribuir</button>
       </div>`;
     }
   }
@@ -1400,7 +1401,11 @@ window.updateLineStake=async(tid,lid,val)=>{
   try{await updateDoc(lRef(tid,lid),{stakeBase:v});setStatus('synced');}
   catch(e){setStatus('offline');}
 };
-window.askDelLine=(tid,lid)=>{lineToDelete={tid,lid};openModal('modalDelL');};
+window.askDelLine=(elOrTid,lid)=>{
+  const tid=elOrTid&&elOrTid.dataset?elOrTid.dataset.tid:elOrTid;
+  const l2=elOrTid&&elOrTid.dataset?elOrTid.dataset.lid:lid;
+  lineToDelete={tid,lid:l2};openModal('modalDelL');
+};
 window.confirmDelLine=async()=>{
   if(!lineToDelete) return;
   closeModal('modalDelL');setStatus('saving');
@@ -1415,7 +1420,9 @@ window.confirmDelLine=async()=>{
 };
 
 // ── GAME CRUD ──
-window.addGame=async(tid,lid,won)=>{
+window.addGame=async(el,won)=>{
+  const tid=el.dataset.tid;
+  const lid=el.dataset.lid;
   const jogador=document.getElementById('fJog_'+lid)?.value.trim();
   const odd=parseFloat(document.getElementById('fOdd_'+lid)?.value);
   const data=document.getElementById('fData_'+lid)?.value.trim();
@@ -1493,9 +1500,11 @@ window.showAlert3Reds=showAlert3Reds;
 // ── ABRIR DISTRIBUIR (pode ser chamado diretamente da linha) ──
 let distribuirContext=null;
 
-window.openDistribuir=function(tid,lid){
+window.openDistribuir=function(elOrTid,lid){
+  const tid=elOrTid&&elOrTid.dataset?elOrTid.dataset.tid:elOrTid;
+  const l2=elOrTid&&elOrTid.dataset?elOrTid.dataset.lid:lid;
   const useTid=tid||alertContext?.tid||currentTid;
-  const useLid=lid||alertContext?.lid||currentLid;
+  const useLid=l2||alertContext?.lid||currentLid;
   if(!useTid||!useLid) return;
 
   const lines=(linesMap[useTid]||[]);
@@ -1710,11 +1719,16 @@ window.saveEditGame=async()=>{
     setStatus('synced');
   }catch(e){alert('Erro: '+e.message);setStatus('offline');}
 };
+
+window.setResult=async(elOrTid,won,lid,gid)=>{
+  let tid;
+  if(elOrTid&&elOrTid.dataset){
+    tid=elOrTid.dataset.tid; lid=elOrTid.dataset.lid; gid=elOrTid.dataset.gid;
+  }else{ tid=elOrTid; }
   setStatus('saving');
   try{
     await updateDoc(gRef(tid,lid,gid),{won});
     setStatus('synced');
-    // Verificar 3 reds consecutivos após salvar
     setTimeout(()=>{
       if(won===false && checkConsecReds(tid,lid)){
         showAlert3Reds(tid,lid);
