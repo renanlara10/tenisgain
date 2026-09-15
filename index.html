@@ -196,6 +196,10 @@ tr:last-child td{border-bottom:none;}
 .btn-loss-t:hover{background:var(--red);color:#fff;}
 .del-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px;transition:color .15s;}
 .del-btn:hover{color:var(--red);}
+.edit-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:12px;transition:color .15s;}
+.edit-btn:hover{color:var(--accent2);}
+.edit-result-active{opacity:1;box-shadow:0 0 0 2px var(--accent);}
+.edit-result-inactive{opacity:.4;}
 
 /* MODAL */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;}
@@ -214,8 +218,8 @@ tr:last-child td{border-bottom:none;}
 .seq-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);}
 .seq-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);}
 .seq-sub{font-size:10px;color:var(--text3);}
-.seq-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 14px;display:flex;justify-content:flex-start;}
-.seq-table{border-collapse:separate;border-spacing:3px;width:auto;table-layout:auto;}
+.seq-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:10px 14px;text-align:left;}
+.seq-table{border-collapse:separate;border-spacing:3px;width:auto;}
 .seq-row-label{white-space:nowrap;padding-right:12px !important;vertical-align:middle;text-align:left;}
 .seq-table td{padding:0;}
 .seq-row-label{white-space:nowrap;padding-right:8px !important;vertical-align:middle;}
@@ -407,7 +411,30 @@ tr:last-child td{border-bottom:none;}
     </div>
   </div>
 </div>
-<div class="modal-overlay" id="modalReset">
+<div class="modal-overlay" id="modalEditGame">
+  <div class="modal" style="max-width:420px">
+    <h3>✏️ Editar aposta</h3>
+    <div class="cfg-field"><label>Data</label>
+      <input type="text" id="editData" placeholder="ex: 15.09" maxlength="10"></div>
+    <div class="cfg-field"><label>Jogador</label>
+      <input type="text" id="editJogador" placeholder="ex: Zverev"></div>
+    <div class="cfg-field"><label>Odd</label>
+      <input type="number" id="editOdd" min="1.01" step="0.01"></div>
+    <div class="cfg-field"><label>Stake (R$)</label>
+      <input type="number" id="editStake" min="0.01" step="0.01"></div>
+    <div class="cfg-field"><label>Resultado</label>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn btn-amber" id="editBtnP" onclick="setEditResult(null)">⏳ Pendente</button>
+        <button class="btn btn-green" id="editBtnW" onclick="setEditResult(true)">✔ Gain</button>
+        <button class="btn btn-red"   id="editBtnL" onclick="setEditResult(false)">✘ Loss</button>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeModal('modalEditGame')">Cancelar</button>
+      <button class="btn" style="background:var(--accent);color:#000;font-weight:700" onclick="saveEditGame()">✔ Salvar</button>
+    </div>
+  </div>
+</div>
   <div class="modal">
     <h3>Resetar tudo?</h3>
     <p>Todos os torneios, linhas e jogos serão apagados permanentemente.</p>
@@ -1193,8 +1220,7 @@ function renderLine(tid,lid,isArchived){
             <button class="btn-gain-t" onclick="setResult('${tid}','${lid}','${r.id}',true)">✔ Gain</button>
             <button class="btn-loss-t" onclick="setResult('${tid}','${lid}','${r.id}',false)">✘ Loss</button>
           </div></td>
-          <td>—</td><td>—</td><td>—</td>
-          <td><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
+          <td><button class="edit-btn" onclick="openEditGame('${tid}','${lid}','${r.id}')">✏️</button><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
         </tr>`;
       }else{
         html+=`<tr class="${r.won?'wr':'lr'}">
@@ -1212,11 +1238,8 @@ function renderLine(tid,lid,isArchived){
           <td>${r.won?`<span style="color:var(--green)">+R$${r.lucro?.toFixed(2)}</span>`:`<span style="color:var(--red)">-R$${r.stake?.toFixed(2)}</span>`}</td>
           <td>${r.lostAfter>0?`<span style="color:var(--amber)">R$${r.lostAfter?.toFixed(2)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
           <td style="font-weight:700;color:${(r.banca||0)>=config.banca?'var(--green)':'var(--red)'}">R$${r.banca?.toFixed(2)}</td>
-          <td><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
+          <td><button class="edit-btn" onclick="openEditGame('${tid}','${lid}','${r.id}')">✏️</button><button class="del-btn" onclick="delGame('${tid}','${lid}','${r.id}')">✕</button></td>
         </tr>`;
-      }
-    });
-    html+=`</tbody></table></div>`;
   }
 
   if(lostAccum>0){
@@ -1633,7 +1656,60 @@ window.confirmarDistribuir=async()=>{
   }
 };
 
-window.setResult=async(tid,lid,gid,won)=>{
+// ── EDITAR JOGO ──
+let editCtx=null; // {tid, lid, gid}
+let editWon=undefined; // null=pendente, true=gain, false=loss
+
+window.openEditGame=function(tid,lid,gid){
+  const games=gamesMap[gkey(tid,lid)]||[];
+  const g=games.find(x=>x.id===gid);
+  if(!g) return;
+  editCtx={tid,lid,gid};
+  editWon=g.won;
+  document.getElementById('editData').value=g.data||'';
+  document.getElementById('editJogador').value=g.jogador||'';
+  document.getElementById('editOdd').value=g.odd||'';
+  document.getElementById('editStake').value=g.stake||'';
+  updateEditResultBtns();
+  openModal('modalEditGame');
+};
+
+window.setEditResult=function(val){
+  editWon=val;
+  updateEditResultBtns();
+};
+
+function updateEditResultBtns(){
+  const activeId=editWon===null?'editBtnP':editWon===true?'editBtnW':'editBtnL';
+  ['editBtnP','editBtnW','editBtnL'].forEach(id=>{
+    const btn=document.getElementById(id);
+    if(id===activeId){btn.style.opacity='1';btn.style.outline='2px solid var(--accent)';}
+    else{btn.style.opacity='.45';btn.style.outline='none';}
+  });
+}
+
+window.saveEditGame=async()=>{
+  if(!editCtx) return;
+  const{tid,lid,gid}=editCtx;
+  const data=document.getElementById('editData').value.trim();
+  const jogador=document.getElementById('editJogador').value.trim();
+  const odd=parseFloat(document.getElementById('editOdd').value);
+  const stake=parseFloat(document.getElementById('editStake').value);
+  if(!jogador){alert('Informe o jogador.');return;}
+  if(!odd||odd<1.01){alert('Odd inválida.');return;}
+  if(!stake||stake<=0){alert('Stake inválida.');return;}
+  setStatus('saving');
+  try{
+    await updateDoc(gRef(tid,lid,gid),{
+      data, jogador,
+      odd:+odd.toFixed(2),
+      stake:+stake.toFixed(2),
+      won:editWon,
+    });
+    closeModal('modalEditGame');
+    setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
   setStatus('saving');
   try{
     await updateDoc(gRef(tid,lid,gid),{won});
