@@ -296,11 +296,36 @@ tr:last-child td{border-bottom:none;}
       <div class="sb-title">⚙ Parâmetros globais</div>
       <div class="cfg-field"><label>Banca inicial (R$)</label>
         <input type="number" id="cfgBanca" value="1000" min="1" step="100" oninput="saveConfig()"></div>
+
+      <!-- TOGGLE MODO -->
       <div class="cfg-field">
+        <label>Modo de aposta</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px">
+          <button id="modoLucroBtn" onclick="setModoAposta('lucro')"
+            style="padding:8px;border-radius:6px;font-family:var(--fm);font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#000;transition:all .15s">
+            🎯 Lucro alvo
+          </button>
+          <button id="modoStakeBtn" onclick="setModoAposta('stake')"
+            style="padding:8px;border-radius:6px;font-family:var(--fm);font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s">
+            💰 Stake base
+          </button>
+        </div>
+      </div>
+
+      <!-- LUCRO ALVO (modo lucro) -->
+      <div class="cfg-field" id="cfgLucroField">
         <label>Lucro alvo por jogo (R$)</label>
         <input type="number" id="cfgLucro" value="20" min="1" step="5" oninput="saveConfig()">
         <span class="cfg-hint">Mesmo lucro em qualquer odd — stake calculada automaticamente</span>
       </div>
+
+      <!-- STAKE BASE (modo stake) -->
+      <div class="cfg-field" id="cfgStakeField" style="display:none">
+        <label>Stake base (R$)</label>
+        <input type="number" id="cfgStakeBase" value="10" min="1" step="5" oninput="saveConfig()">
+        <span class="cfg-hint">Stake fixa no início do ciclo — lucro varia com a odd</span>
+      </div>
+
       <div class="cfg-field"><label>Odd mínima</label>
         <input type="number" id="cfgOddMin" value="1.50" min="1.01" step="0.01" oninput="saveConfig()"></div>
       <div class="cfg-field"><label>Odd máxima</label>
@@ -629,24 +654,60 @@ async function init(){
 
 // ── CONFIG ──
 function applyConfigUI(){
-  document.getElementById('cfgBanca').value  = config.banca;
-  document.getElementById('cfgLucro').value  = config.lucro;
-  document.getElementById('cfgOddMin').value = config.oddMin;
-  document.getElementById('cfgOddMax').value = config.oddMax;
+  document.getElementById('cfgBanca').value    = config.banca;
+  document.getElementById('cfgLucro').value    = config.lucro;
+  document.getElementById('cfgStakeBase').value= config.stakeBase||10;
+  document.getElementById('cfgOddMin').value   = config.oddMin;
+  document.getElementById('cfgOddMax').value   = config.oddMax;
+  setModoAposta(config.modo||'lucro', true);
   updateFormulaDisplay();
 }
+window.setModoAposta=function(modo, silent){
+  config.modo=modo;
+  const isLucro=modo==='lucro';
+  // Toggle visual
+  const lb=document.getElementById('modoLucroBtn');
+  const sb=document.getElementById('modoStakeBtn');
+  if(lb&&sb){
+    lb.style.background=isLucro?'var(--accent)':'transparent';
+    lb.style.color=isLucro?'#000':'var(--text2)';
+    lb.style.borderColor=isLucro?'var(--accent)':'var(--border)';
+    sb.style.background=!isLucro?'var(--accent2)':'transparent';
+    sb.style.color=!isLucro?'#fff':'var(--text2)';
+    sb.style.borderColor=!isLucro?'var(--accent2)':'var(--border)';
+  }
+  // Mostrar campo correto
+  const lf=document.getElementById('cfgLucroField');
+  const sf=document.getElementById('cfgStakeField');
+  if(lf) lf.style.display=isLucro?'':'none';
+  if(sf) sf.style.display=!isLucro?'':'none';
+  updateFormulaDisplay();
+  if(!silent) saveConfig();
+};
+
 function updateFormulaDisplay(){
-  const l=config.lucro||20;
-  document.getElementById('cfgFormula').textContent=`stake = (prej. + R$${l}) ÷ (odd−1)`;
-  document.getElementById('cfgFormulaEx').textContent=
-    `@ 1.50 → R$${(l/0.50).toFixed(2)} · @ 1.75 → R$${(l/0.75).toFixed(2)} · @ 2.00 → R$${(l/1.00).toFixed(2)}`;
+  const modo=config.modo||'lucro';
+  const isLucro=modo==='lucro';
+  if(isLucro){
+    const l=config.lucro||20;
+    document.getElementById('cfgFormula').textContent='stake = (prej. + R$'+l+') ÷ (odd−1)';
+    document.getElementById('cfgFormulaEx').textContent=
+      '@ 1.50 → R$'+(l/0.50).toFixed(2)+' · @ 1.75 → R$'+(l/0.75).toFixed(2)+' · @ 2.00 → R$'+(l/1.00).toFixed(2);
+  }else{
+    const s=config.stakeBase||10;
+    document.getElementById('cfgFormula').textContent='base: R$'+s+' · recup: R$'+s+' + prej ÷ (odd−1)';
+    document.getElementById('cfgFormulaEx').textContent=
+      '@ 1.50: base R$'+s+', recup = R$'+s+' + prej÷0.50 · @ 1.75: base R$'+s+', recup = R$'+s+' + prej÷0.75';
+  }
 }
 window.saveConfig=async()=>{
   config={
-    banca: parseFloat(document.getElementById('cfgBanca').value)||1000,
-    lucro: parseFloat(document.getElementById('cfgLucro').value)||20,
-    oddMin:parseFloat(document.getElementById('cfgOddMin').value)||1.50,
-    oddMax:parseFloat(document.getElementById('cfgOddMax').value)||2.00,
+    banca:     parseFloat(document.getElementById('cfgBanca').value)||1000,
+    modo:      config.modo||'lucro',
+    lucro:     parseFloat(document.getElementById('cfgLucro').value)||20,
+    stakeBase: parseFloat(document.getElementById('cfgStakeBase').value)||10,
+    oddMin:    parseFloat(document.getElementById('cfgOddMin').value)||1.50,
+    oddMax:    parseFloat(document.getElementById('cfgOddMax').value)||2.00,
   };
   updateFormulaDisplay();
   setStatus('saving');
@@ -712,21 +773,36 @@ function calcLine(games, stakeBase){
   return{rows,lostAccum,maxLost,totV,totD};
 }
 
-// Calcular próxima stake — lucro alvo fixo com % recuperação opcional
-// stake = (prej × recPct% + lucro) ÷ (odd−1)
-// recPct=100 → recupera tudo (padrão)
-// recPct=30  → recupera 30% do prejuízo + garante o lucro alvo
+// Calcular próxima stake — dois modos:
+// lucro: stake = (prej×recPct% + lucro) ÷ (odd−1)
+// stake: stake = stakeBase + prej×recPct% ÷ (odd−1)
 function calcNextStake(tid,lid,odd,recPct){
+  const modo=config.modo||'lucro';
   const lucro=config.lucro||20;
+  const stakeBase=config.stakeBase||10;
   const pct=(recPct??100)/100;
   const games=gamesMap[gkey(tid,lid)]||[];
   const settled=games.filter(g=>g.won!==null&&g.won!==undefined);
   const{lostAccum}=calcLine(settled,0);
   const o=parseFloat(odd)||0;
-  if(!o||o<1.01) return{stake:+(lucro/0.50).toFixed(2),lostAccum,modo:'normal',ok:false,lucro,recPct:recPct??100};
-  // Com pct: recupera (lostAccum × pct) + lucro
-  const stake=(lostAccum*pct+lucro)/(o-1);
-  return{stake:+stake.toFixed(2),lostAccum,modo:lostAccum===0?'normal':'recup',ok:true,lucro,recPct:recPct??100};
+  if(!o||o<1.01){
+    const defStake=modo==='lucro'?+(lucro/0.50).toFixed(2):stakeBase;
+    return{stake:defStake,lostAccum,modo:'normal',ok:false,lucro,stakeBase,modoAposta:modo};
+  }
+  let stake;
+  if(modo==='lucro'){
+    // stake = (prej×pct + lucro) ÷ (odd−1)
+    stake=(lostAccum*pct+lucro)/(o-1);
+  }else{
+    // stake = stakeBase + prej×pct ÷ (odd−1)
+    stake=stakeBase+(lostAccum*pct)/(o-1);
+  }
+  return{
+    stake:+stake.toFixed(2),lostAccum,
+    modo:lostAccum===0?'normal':'recup',
+    ok:true,lucro,stakeBase,modoAposta:modo,
+    lucroEsperado:modo==='lucro'?lucro:+(stakeBase*(o-1)).toFixed(2)
+  };
 }
 
 // Consolidado global
@@ -1270,14 +1346,16 @@ function renderLine(tid,lid,isArchived){
 
 // ── UPDATE NEXT BET ──
 function updateNBCore(tid,lid,odd,recPct){
-  const{stake,lostAccum,modo,ok,lucro}=calcNextStake(tid,lid,odd,recPct);
+  const{stake,lostAccum,ok,lucroEsperado,modoAposta,stakeBase}=calcNextStake(tid,lid,odd,recPct);
   const nb=document.getElementById('nb_'+lid);
   if(!nb) return;
   const isRec=lostAccum>0;
   const pct=recPct??100;
+  const lucroStr=lucroEsperado?'R$'+lucroEsperado.toFixed(2):'R$?';
+  const sb=stakeBase||10;
 
   nb.className='next-bet'+(isRec?' recovery':'');
-  document.getElementById('nbLbl_'+lid).textContent=isRec?`↩ Recuperação (${pct}%)`:'▶ Stake para esta aposta';
+  document.getElementById('nbLbl_'+lid).textContent=isRec?('↩ Recuperação ('+pct+'%)'):'▶ Stake para esta aposta';
   document.getElementById('nbLbl_'+lid).className='nb-label'+(isRec?' r':'');
   document.getElementById('nbVal_'+lid).textContent=ok?'R$ '+stake.toFixed(2):'—';
   document.getElementById('nbVal_'+lid).className='nb-val'+(isRec?' r':'');
@@ -1285,23 +1363,28 @@ function updateNBCore(tid,lid,odd,recPct){
   if(!ok){
     document.getElementById('nbSub_'+lid).textContent='Digite a odd para calcular a stake';
     document.getElementById('nbFrm_'+lid).textContent=
-      isRec?`Fórmula: (R$${lostAccum.toFixed(2)}×${pct}% + R$${lucro}) ÷ (odd−1)`
-           :`Fórmula: (R$0 + R$${lucro}) ÷ (odd−1)`;
+      modoAposta==='lucro'?'Fórmula: (prej + lucro) ÷ (odd−1)':'Fórmula: R$'+sb+' + prej ÷ (odd−1)';
   }else{
     if(isRec){
       const recValor=+(lostAccum*(pct/100)).toFixed(2);
       const restante=+(lostAccum-recValor).toFixed(2);
       document.getElementById('nbSub_'+lid).textContent=
-        `Recupera R$${recValor} (${pct}% de R$${lostAccum.toFixed(2)}) + R$${lucro} lucro`;
+        modoAposta==='lucro'
+          ?('Recupera R$'+recValor+' ('+pct+'% de R$'+lostAccum.toFixed(2)+') + lucro '+lucroStr)
+          :('Stake base R$'+sb+' + recupera R$'+recValor+' ('+pct+'%)');
       document.getElementById('nbFrm_'+lid).textContent=
-        `(R$${lostAccum.toFixed(2)}×${pct}% + R$${lucro}) ÷ (${odd.toFixed(2)}−1) = R$${stake.toFixed(2)}`;
-      // Atualizar "prejuízo restante após gain"
+        modoAposta==='lucro'
+          ?('(R$'+lostAccum.toFixed(2)+'x'+pct+'% + '+lucroStr+') / ('+odd.toFixed(2)+'-1) = R$'+stake.toFixed(2))
+          :('R$'+sb+' + R$'+lostAccum.toFixed(2)+'x'+pct+'%/('+odd.toFixed(2)+'-1) = R$'+stake.toFixed(2));
       const restEl=document.getElementById('fRecPctRest_'+lid);
       if(restEl) restEl.textContent='R$'+restante.toFixed(2);
     }else{
-      document.getElementById('nbSub_'+lid).textContent=`Lucro fixo garantido: R$${lucro.toFixed(2)}`;
+      document.getElementById('nbSub_'+lid).textContent=
+        modoAposta==='lucro'?('Lucro fixo: '+lucroStr):('Lucro esperado: '+lucroStr+' (stake x (odd-1))');
       document.getElementById('nbFrm_'+lid).textContent=
-        `(R$0 + R$${lucro}) ÷ (${odd.toFixed(2)}−1) = R$${stake.toFixed(2)}`;
+        modoAposta==='lucro'
+          ?('(R$0 + '+lucroStr+') / ('+odd.toFixed(2)+'-1) = R$'+stake.toFixed(2))
+          :('Stake base R$'+sb+' @ '+odd.toFixed(2)+' → lucro '+lucroStr);
     }
   }
 }
@@ -1435,8 +1518,8 @@ window.addGame=async(el,won)=>{
   const recPctEl=document.getElementById('fRecPct_'+lid);
   const recPct=recPctEl?parseInt(recPctEl.value):100;
 
-  const{stake,lostAccum,modo}=calcNextStake(tid,lid,odd,recPct);
-  const lucroAlvo=config.lucro||20;
+  const{stake,lostAccum,modo,lucroEsperado,modoAposta}=calcNextStake(tid,lid,odd,recPct);
+  const lucroAlvo=lucroEsperado||config.lucro||20;
 
   ['btnP_','btnW_','btnL_'].forEach(p=>{
     const el=document.getElementById(p+lid);if(el)el.disabled=true;
