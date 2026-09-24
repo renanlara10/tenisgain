@@ -98,10 +98,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100
 .td-meta{font-size:11px;color:var(--text3);margin-top:2px;}
 .btn-back{background:transparent;border:1px solid var(--border);color:var(--text2);padding:7px 14px;border-radius:6px;font-family:var(--fm);font-size:12px;cursor:pointer;flex-shrink:0;}
 .btn-back:hover{border-color:var(--text);color:var(--text);}
-.btn-archive{background:transparent;border:1px solid var(--border);color:var(--text3);padding:6px 12px;border-radius:6px;font-family:var(--fm);font-size:11px;cursor:pointer;margin-left:auto;}
+.btn-report{background:transparent;border:1px solid var(--accent2);color:var(--accent2);padding:6px 12px;border-radius:6px;font-family:var(--fm);font-size:11px;cursor:pointer;margin-left:auto;}
+.btn-report:hover{background:var(--accent2);color:#fff;}
+.btn-archive{background:transparent;border:1px solid var(--border);color:var(--text3);padding:6px 12px;border-radius:6px;font-family:var(--fm);font-size:11px;cursor:pointer;margin-left:6px;}
 .btn-archive:hover{border-color:var(--amber);color:var(--amber);}
 .btn-del-t{background:transparent;border:1px solid var(--border);color:var(--text3);padding:6px 12px;border-radius:6px;font-family:var(--fm);font-size:11px;cursor:pointer;margin-left:6px;}
 .btn-del-t:hover{border-color:var(--red);color:var(--red);}
+.modal.modal-wide{max-width:700px;width:95vw;}
+.rel-table-wrap{overflow-x:auto;max-height:60vh;overflow-y:auto;border-radius:8px;border:1px solid var(--border);}
+.rel-table{width:100%;border-collapse:collapse;font-size:11px;}
+.rel-table th{text-align:left;padding:8px 10px;background:var(--surface2);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0;border-bottom:1px solid var(--border);}
+.rel-table td{padding:7px 10px;border-bottom:1px solid #1e2026;}
+.rel-table tr:last-child td{border-bottom:none;}
+.rel-table tr.wr{background:#0a150b;}
+.rel-table tr.lr{background:#150a0b;}
+.rel-table tr.pr{background:#1a1208;}
+.rel-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+.rel-sum-item{background:var(--surface2);border-radius:8px;padding:10px;text-align:center;}
+.rel-sum-item .rv{font-family:var(--fh);font-size:16px;font-weight:700;}
+.rel-sum-item .rl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;}
 .btn-unarchive{border-color:var(--accent2)!important;color:var(--accent2)!important;}
 
 /* LINES TABS */
@@ -363,6 +378,7 @@ tr:last-child td{border-bottom:none;}
           <div class="td-title" id="tdName"></div>
           <div class="td-meta"  id="tdMeta"></div>
         </div>
+        <button class="btn-report" onclick="openRelatorio()">📊 Relatório</button>
         <button class="btn-archive" id="btnArchive" onclick="toggleArchive()">Arquivar</button>
         <button class="btn-del-t" id="btnDelT" onclick="askDelTournament()">🗑 Excluir</button>
       </div>
@@ -514,7 +530,25 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
-<!-- MODAL DISTRIBUIR PREJUÍZO -->
+<!-- MODAL RELATÓRIO -->
+<div class="modal-overlay" id="modalRelatorio">
+  <div class="modal modal-wide">
+    <h3>📊 Relatório — <span id="relNome" style="color:var(--accent)"></span></h3>
+    <div class="rel-summary" id="relSummary"></div>
+    <div class="rel-table-wrap">
+      <table class="rel-table">
+        <thead><tr>
+          <th>#</th><th>Data</th><th>Linha</th><th>Jogador</th>
+          <th>Odd</th><th>Stake</th><th>Resultado</th><th>Saldo Banca</th>
+        </tr></thead>
+        <tbody id="relBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeModal('modalRelatorio')">Fechar</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="modalDistribuir">
   <div class="modal" style="max-width:500px">
     <h3>⚡ Distribuir prejuízo entre linhas</h3>
@@ -1427,6 +1461,75 @@ window.createTournament=async()=>{
     setStatus('synced');
   }catch(e){alert('Erro: '+e.message);setStatus('offline');}
 };
+// ── RELATÓRIO DO TORNEIO ──
+window.openRelatorio=function(){
+  if(!currentTid) return;
+  const t=tournaments.find(x=>x.id===currentTid);
+  if(!t) return;
+
+  document.getElementById('relNome').textContent=t.name;
+
+  const lines=linesMap[currentTid]||[];
+  const bancaInicial=config.banca||1000;
+
+  // Coletar todos os jogos reais de todas as linhas com timestamp
+  const allGames=[];
+  lines.forEach(l=>{
+    const games=(gamesMap[gkey(currentTid,l.id)]||[])
+      .filter(g=>!g.isDistrib&&g.won!==null&&g.won!==undefined);
+    games.forEach(g=>allGames.push({...g,linhaNome:l.name}));
+  });
+
+  // Ordenar por timestamp (ordem cronológica global)
+  allGames.sort((a,b)=>{
+    const ta=a.ts?.seconds||0, tb=b.ts?.seconds||0;
+    return ta-tb;
+  });
+
+  // Calcular saldo acumulado da banca (todas as linhas juntas)
+  // Cada jogo movimenta a banca global = N linhas × bancaInicial
+  // Mas exibimos a banca consolidada = soma de todas as linhas
+  // Simples: banca = bancaInicial × N + soma de lucros/perdas até agora
+  const N=lines.length;
+  let bancaConsol=bancaInicial*N;
+  let totV=0, totD=0, totLucro=0;
+
+  const rows=allGames.map((g,i)=>{
+    const lucro=g.won?+(g.lucroAlvo||config.lucro||20).toFixed(2):-(g.stake);
+    bancaConsol=+(bancaConsol+lucro).toFixed(2);
+    if(g.won) totV++; else totD++;
+    totLucro=+(totLucro+lucro).toFixed(2);
+    return{...g,bancaConsol,lucro,num:i+1};
+  });
+
+  // Summary
+  const saldoPos=totLucro>=0;
+  document.getElementById('relSummary').innerHTML=
+    '<div class="rel-sum-item"><div class="rv">'+allGames.length+'</div><div class="rl">Total jogos</div></div>'+
+    '<div class="rel-sum-item"><div class="rv"><span style="color:var(--green)">'+totV+'V</span> · <span style="color:var(--red)">'+totD+'D</span></div><div class="rl">Resultado</div></div>'+
+    '<div class="rel-sum-item"><div class="rv">'+((totV/(totV+totD||1))*100).toFixed(0)+'%</div><div class="rl">Acerto</div></div>'+
+    '<div class="rel-sum-item"><div class="rv" style="color:'+(saldoPos?'var(--green)':'var(--red)')+')">'+(saldoPos?'+':'')+totLucro.toFixed(2)+'</div><div class="rl">Saldo R$</div></div>';
+
+  // Tabela
+  const tbody=document.getElementById('relBody');
+  tbody.innerHTML=rows.map(r=>{
+    const res=r.won?'<span class="pill pw">✔ Gain</span>':'<span class="pill pl">✘ Loss</span>';
+    const bancaColor=r.bancaConsol>=(bancaInicial*N)?'var(--green)':'var(--red)';
+    return '<tr class="'+(r.won?'wr':'lr')+'">'+
+      '<td style="color:var(--text3)">'+r.num+'</td>'+
+      '<td style="color:var(--text2)">'+r.data+'</td>'+
+      '<td style="color:var(--accent2)">'+r.linhaNome+'</td>'+
+      '<td style="font-weight:500">'+r.jogador+'</td>'+
+      '<td style="font-weight:700;color:var(--accent)">'+r.odd.toFixed(2)+'</td>'+
+      '<td>R$'+r.stake.toFixed(2)+'</td>'+
+      '<td>'+res+'</td>'+
+      '<td style="font-weight:700;color:'+bancaColor+'">R$'+r.bancaConsol.toFixed(2)+'</td>'+
+    '</tr>';
+  }).join('');
+
+  openModal('modalRelatorio');
+};
+
 window.toggleArchive=async()=>{
   if(!currentTid) return;
   const t=tournaments.find(x=>x.id===currentTid);
