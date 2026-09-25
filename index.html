@@ -1483,17 +1483,17 @@ window.openRelatorio=function(){
   // Ordenar por timestamp
   allGames.sort((a,b)=>(a.ts?.seconds||0)-(b.ts?.seconds||0));
 
-  // Saldo acumulado começa em 0
-  // Gain: soma o lucroAlvo gravado no jogo (já calculado na hora do registro)
-  // Loss: subtrai a stake
+  // Saldo acumulado começa em 0 — mesma lógica da sidebar
+  // Gain: retorno real = stake × odd - stake = stake × (odd - 1)
+  // Loss: -stake
   let saldoAcum=0;
   let totV=0, totD=0;
 
   const rows=allGames.map((g,i)=>{
     let mov=0;
     if(g.won){
-      // lucroAlvo gravado no jogo = lucro real obtido
-      mov=+(g.lucroAlvo||config.lucro||20);
+      // Mesmo cálculo da sidebar: banca - stake + stake*odd → lucro = stake*(odd-1)
+      mov=+(g.stake*(g.odd-1)).toFixed(2);
       totV++;
     }else{
       mov=-+(g.stake||0);
