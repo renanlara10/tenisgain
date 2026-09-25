@@ -539,7 +539,7 @@ tr:last-child td{border-bottom:none;}
       <table class="rel-table">
         <thead><tr>
           <th>#</th><th>Data</th><th>Linha</th><th>Jogador</th>
-          <th>Odd</th><th>Stake</th><th>Resultado</th><th>Saldo Banca</th>
+          <th>Odd</th><th>Stake</th><th>Resultado</th><th>Mov.</th><th>Saldo</th>
         </tr></thead>
         <tbody id="relBody"></tbody>
       </table>
@@ -1480,30 +1480,33 @@ window.openRelatorio=function(){
     games.forEach(g=>allGames.push({...g,linhaNome:l.name}));
   });
 
-  // Ordenar por timestamp (ordem cronológica global)
-  allGames.sort((a,b)=>{
-    const ta=a.ts?.seconds||0, tb=b.ts?.seconds||0;
-    return ta-tb;
-  });
+  // Ordenar por timestamp
+  allGames.sort((a,b)=>(a.ts?.seconds||0)-(b.ts?.seconds||0));
 
-  // Calcular saldo acumulado da banca (todas as linhas juntas)
-  // Cada jogo movimenta a banca global = N linhas × bancaInicial
-  // Mas exibimos a banca consolidada = soma de todas as linhas
-  // Simples: banca = bancaInicial × N + soma de lucros/perdas até agora
-  const N=lines.length;
-  let bancaConsol=bancaInicial*N;
-  let totV=0, totD=0, totLucro=0;
+  // Saldo acumulado começa em 0
+  // Gain: soma o lucroAlvo gravado no jogo (já calculado na hora do registro)
+  // Loss: subtrai a stake
+  let saldoAcum=0;
+  let totV=0, totD=0;
 
   const rows=allGames.map((g,i)=>{
-    const lucro=g.won?+(g.lucroAlvo||config.lucro||20).toFixed(2):-(g.stake);
-    bancaConsol=+(bancaConsol+lucro).toFixed(2);
-    if(g.won) totV++; else totD++;
-    totLucro=+(totLucro+lucro).toFixed(2);
-    return{...g,bancaConsol,lucro,num:i+1};
+    let mov=0;
+    if(g.won){
+      // lucroAlvo gravado no jogo = lucro real obtido
+      mov=+(g.lucroAlvo||config.lucro||20);
+      totV++;
+    }else{
+      mov=-+(g.stake||0);
+      totD++;
+    }
+    saldoAcum=+(saldoAcum+mov).toFixed(2);
+    return{...g,mov,saldoAcum,num:i+1};
   });
 
-  // Summary
+  const totLucro=saldoAcum;
   const saldoPos=totLucro>=0;
+
+  // Summary
   document.getElementById('relSummary').innerHTML=
     '<div class="rel-sum-item"><div class="rv">'+allGames.length+'</div><div class="rl">Total jogos</div></div>'+
     '<div class="rel-sum-item"><div class="rv"><span style="color:var(--green)">'+totV+'V</span> · <span style="color:var(--red)">'+totD+'D</span></div><div class="rl">Resultado</div></div>'+
@@ -1514,7 +1517,8 @@ window.openRelatorio=function(){
   const tbody=document.getElementById('relBody');
   tbody.innerHTML=rows.map(r=>{
     const res=r.won?'<span class="pill pw">✔ Gain</span>':'<span class="pill pl">✘ Loss</span>';
-    const bancaColor=r.bancaConsol>=(bancaInicial*N)?'var(--green)':'var(--red)';
+    const saldoColor=r.saldoAcum>=0?'var(--green)':'var(--red)';
+    const movStr=r.mov>=0?'+R$'+r.mov.toFixed(2):'-R$'+Math.abs(r.mov).toFixed(2);
     return '<tr class="'+(r.won?'wr':'lr')+'">'+
       '<td style="color:var(--text3)">'+r.num+'</td>'+
       '<td style="color:var(--text2)">'+r.data+'</td>'+
@@ -1523,7 +1527,10 @@ window.openRelatorio=function(){
       '<td style="font-weight:700;color:var(--accent)">'+r.odd.toFixed(2)+'</td>'+
       '<td>R$'+r.stake.toFixed(2)+'</td>'+
       '<td>'+res+'</td>'+
-      '<td style="font-weight:700;color:'+bancaColor+'">R$'+r.bancaConsol.toFixed(2)+'</td>'+
+      '<td style="color:'+(r.mov>=0?'var(--green)':'var(--red)')+'">'+movStr+'</td>'+
+      '<td style="font-weight:700;color:'+saldoColor+'">'+
+        (r.saldoAcum>=0?'+':'')+r.saldoAcum.toFixed(2)+
+      '</td>'+
     '</tr>';
   }).join('');
 
