@@ -248,6 +248,7 @@ tr.vr{background:#12121e;opacity:.75;}
 .seq-cell.gain{background:#166534;color:#4ade80;}
 .seq-cell.loss{background:#7f1d1d;color:#f87171;}
 .seq-cell.pend{background:#3a2e10;color:#fb923c;}
+.seq-cell.void{background:#1a1a2e;color:#8b8bcc;font-size:13px;}
 .seq-cell:hover .seq-tooltip{display:block;}
 .seq-tooltip{display:none;position:absolute;bottom:26px;left:50%;transform:translateX(-50%);background:#1e2026;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:10px;color:var(--text);white-space:nowrap;z-index:99;pointer-events:none;}
 .warn-box{border:1px solid var(--amber);border-left:3px solid var(--amber);border-radius:var(--r);padding:12px 16px;margin-top:12px;font-size:12px;background:#1a1208;color:var(--amber);line-height:1.7;}
@@ -1105,7 +1106,12 @@ function renderSeqPanel(tid){
     const cells=[];
     let streak=0, lastResult=null;
     for(const g of games){
-      const res=g.won===true?'gain':g.won===false?'loss':'pend';
+      const res=g.won===true?'gain':g.won===false?'loss':g.won==='anulado'?'void':'pend';
+      if(res==='void'||res==='pend'){
+        // anulado e pendente não entram no streak — inseridos isolados
+        cells.push({res,streak:0,jogador:g.jogador,odd:g.odd,stake:g.stake});
+        continue;
+      }
       if(res===lastResult||lastResult===null){
         streak++;
       }else{
@@ -1137,9 +1143,10 @@ function renderSeqPanel(tid){
     for(let i=0;i<cells.length;i++){
       const c=cells[i];
       const tip=`${c.jogador||'—'} · odd ${c.odd?.toFixed(2)||'—'} · R$${c.stake?.toFixed(2)||'—'}`;
+      const label=c.res==='void'?'⊘':c.res==='pend'?'…':c.streak;
       html+=`<td class="seq-cell ${c.res}">
-        ${c.streak}
-        <div class="seq-tooltip">${tip}</div>
+        ${label}
+        <div class="seq-tooltip">${tip}${c.res==='void'?' · Anulado':''}</div>
       </td>`;
     }
     html+='</tr>';
