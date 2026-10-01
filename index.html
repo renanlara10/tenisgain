@@ -209,6 +209,10 @@ tr:last-child td{border-bottom:none;}
 .btn-gain-t:hover{background:var(--green);color:#0a1a0a;}
 .btn-loss-t{background:#2e0d12;color:var(--red);border:1px solid #4a1a20;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
 .btn-loss-t:hover{background:var(--red);color:#fff;}
+.btn-void-t{background:#1a1a2e;color:#8b8bcc;border:1px solid #2a2a4a;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-void-t:hover{background:#2a2a4a;color:#b0b0ff;}
+.pill-void{display:inline-block;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600;background:#1a1a2e;color:#8b8bcc;border:1px solid #2a2a4a;}
+tr.vr{background:#12121e;opacity:.75;}
 .del-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:13px;transition:color .15s;}
 .del-btn:hover{color:var(--red);}
 .edit-btn{background:none;border:none;color:var(--text3);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:12px;transition:color .15s;}
@@ -758,8 +762,11 @@ function calcLine(games, stakeBase){
   const lucroAlvo=config.lucro||20;
   const rows=games.map(g=>{
     const isPend=g.won===null||g.won===undefined;
+    const isVoid=g.won==='anulado';
     const stake=g.stake||0;
     if(isPend) return{...g,lucro:0,lostAfter:lostAccum,banca:null,pending:true};
+    // Jogo anulado: não afeta lostAccum nem saldo — apenas registra
+    if(isVoid) return{...g,lucro:0,lostAfter:lostAccum,pending:false,voided:true};
 
     // Entradas de distribuição — ajuste direto no lostAccum
     if(g.isDistrib){
@@ -895,7 +902,8 @@ function calcTournamentSaldo(tid){
     // Apenas jogos reais (won true/false, !isDistrib) movimentam a banca
     let banca=bancaInicial;
     allGames.forEach(g=>{
-      if(g.isDistrib) return; // não move banca real
+      if(g.isDistrib) return;
+      if(g.won==='anulado') return; // anulado não move banca
       if(g.won) banca=+(banca-g.stake+g.stake*g.odd).toFixed(2);
       else banca=+(banca-g.stake).toFixed(2);
     });
@@ -1282,6 +1290,7 @@ function renderLine(tid,lid,isArchived){
         <div class="pc-btns">
           <button class="btn-gain-t" onclick="setResult(this,true)" data-tid="${tid}" data-lid="${lid}" data-gid="${p.id}">✔ Gain</button>
           <button class="btn-loss-t" onclick="setResult(this,false)" data-tid="${tid}" data-lid="${lid}" data-gid="${p.id}">✘ Loss</button>
+          <button class="btn-void-t" onclick="anularJogo(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${p.id}">⊘ Anular</button>
         </div>
       </div>`).join('')}
       </div>
@@ -1306,7 +1315,22 @@ function renderLine(tid,lid,isArchived){
     let realCount=totalReal;
     [...rows].reverse().forEach((r,i)=>{
       const num=r.distribEntry?'—':realCount--;
-      if(r.distribEntry){
+      if(r.voided){
+        html+=`<tr class="vr">
+          <td style="color:var(--text3)">${num}</td>
+          <td style="color:var(--text3)">${r.data||'—'}</td>
+          <td style="color:var(--text3)">${r.jogador}</td>
+          <td style="color:var(--text3)">${r.odd?.toFixed(2)}</td>
+          <td>—</td>
+          <td style="color:var(--text3)">R$${r.stake?.toFixed(2)}</td>
+          <td>${r.prejBefore>0?'<span style="color:var(--amber)">R$'+r.prejBefore?.toFixed(2)+'</span>':'—'}</td>
+          <td><span class="pill-void">⊘ Anulado</span></td>
+          <td style="color:var(--text3)">—</td>
+          <td style="color:var(--text3)">—</td>
+          <td style="color:var(--text3)">—</td>
+          <td><button class="del-btn" onclick="delGame(this)" data-tid="${tid}" data-lid="${lid}" data-gid="${r.id}">✕</button></td>
+        </tr>`;
+      }else if(r.distribEntry){
         html+=`<tr style="background:#0e1a1a;opacity:.7">
           <td style="color:var(--text3)">${num}</td>
           <td style="color:var(--text3)">—</td>
@@ -1476,7 +1500,7 @@ window.openRelatorio=function(){
   const allGames=[];
   lines.forEach(l=>{
     const games=(gamesMap[gkey(currentTid,l.id)]||[])
-      .filter(g=>!g.isDistrib&&g.won!==null&&g.won!==undefined);
+      .filter(g=>!g.isDistrib&&g.won!==null&&g.won!==undefined&&g.won!=='anulado');
     games.forEach(g=>allGames.push({...g,linhaNome:l.name}));
   });
 
@@ -1911,6 +1935,16 @@ window.saveEditGame=async()=>{
       won:editWon,
     });
     closeModal('modalEditGame');
+    setStatus('synced');
+  }catch(e){alert('Erro: '+e.message);setStatus('offline');}
+};
+
+window.anularJogo=async(el)=>{
+  const tid=el.dataset.tid, lid=el.dataset.lid, gid=el.dataset.gid;
+  if(!confirm('Anular este jogo? A aposta será devolvida e o resultado marcado como anulado.')) return;
+  setStatus('saving');
+  try{
+    await updateDoc(gRef(tid,lid,gid),{won:'anulado'});
     setStatus('synced');
   }catch(e){alert('Erro: '+e.message);setStatus('offline');}
 };
